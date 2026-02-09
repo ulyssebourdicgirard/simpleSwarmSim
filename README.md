@@ -1,6 +1,6 @@
 # Drone Swarm Optimization Prototype
 
-This repository contains a Python prototype for optimizing autonomous drone swarm behaviors. It implements a particle-based simulation where interaction rules—attraction, alignment, and repulsion—are tuned using a Genetic Algorithm (GA).
+This repository contains a Python prototype for optimizing autonomous drone swarm behaviors. It implements a particle-based simulation where interaction rules, attraction, alignment, and repulsion, are tuned using a Genetic Algorithm (GA).
 
 The project provides two mathematically equivalent implementations:
 1. **CPU Baseline (`Mk1`)**: Uses NumPy and multiprocessing.

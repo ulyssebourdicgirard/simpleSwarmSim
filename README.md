@@ -68,7 +68,7 @@ python Mk2_GPU_Full.py'''
 ## Configuration
 Simulation parameters and cost function weights can be modified in config.py:
 
-'''python
+```python
 W_EFFORT 
 W_DISP 
 W_POL 

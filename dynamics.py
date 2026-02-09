@@ -42,19 +42,17 @@ def compute_derivatives(pos, phi, v, p, xp=np):
         y_att, y_ali = y_att[..., None], y_ali[..., None]
         d0_att, l_att, l_ali = d0_att[..., None], l_att[..., None], l_ali[..., None]
 
-    # --- Wall Interaction ---
+    # --- Wall Interaction (Exp) ---
     dist_center = xp.linalg.norm(pos, axis=-1)
-    penetration = dist_center - ARENA_RADIUS
-    mask_wall = penetration > 0
     
-    # Angle reflection
+    # Heading error rel. to center
     angle_to_center = xp.arctan2(-pos[..., 1], -pos[..., 0])
     psi_center = (angle_to_center - phi + xp.pi) % (2 * xp.pi) - xp.pi
     
-    w_force = xp.zeros_like(phi)
-    if xp.any(mask_wall):
-        w_vals = 3.0 * penetration * xp.sin(psi_center)
-        w_force = xp.where(mask_wall, w_vals, 0.0)
+    # Exponential repulsion: F ~ 0 at 4m, F >> 1 at 0m
+    # 100 * exp(-8) ~= 0.033 (Negligible at 4m)
+    # 100 * exp(0)   = 100.0 (Saturates at contact)
+    w_force = 100.0 * xp.exp(2.0 * (dist_center - ARENA_RADIUS)) * xp.sin(psi_center)
 
     # --- Social Interaction ---
     pos_i = xp.expand_dims(pos, -2) 

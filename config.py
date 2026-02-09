@@ -17,10 +17,10 @@ SIM_STEPS = 500
 VISU_STEPS = 1000      
 
 # Cost Function Weights
-W_EFFORT = 0.05
+W_EFFORT = 0.05   
 W_DISP = 1.0
 W_POL = 2.0
-W_COLL = 2000.0  
+W_COLL = 5000.0 
 
 # Hardware
 try:

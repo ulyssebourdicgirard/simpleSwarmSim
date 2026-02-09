@@ -59,11 +59,11 @@ To ensure convergence, the evaluation phase uses **Frozen Noise** (fixed random 
 
 **CPU Mode:**
 ```bash
-python Mk1_CPU_Full.py'''
+python Mk1_CPU_Full.py```
 
 **GPU Mode:**
 ```bash
-python Mk2_GPU_Full.py'''
+python Mk2_GPU_Full.py```
 
 ## Configuration
 Simulation parameters and cost function weights can be modified in config.py:
@@ -72,4 +72,4 @@ Simulation parameters and cost function weights can be modified in config.py:
 W_EFFORT 
 W_DISP 
 W_POL 
-W_COLL'''
+W_COLL```

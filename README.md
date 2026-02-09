@@ -13,7 +13,7 @@ The system is designed to ensure strict consistency between CPU and GPU results 
 ### Core Modules
 * `config.py`: Defines global constants for the environment (timestep, arena size, drone count) and optimization weights.
 * `dynamics.py`: Implements the physics engine and cost function. It handles:
-    * **Forces**: Lennard-Jones style attraction/repulsion and heading alignment.
+    * **Forces**: Attraction/repulsion and heading alignment.
     * **Constraints**: Soft-boundary wall repulsion.
     * **Metrics**: Calculation of Dispersion, Control Effort, Polarization, and Collisions.
 
@@ -30,7 +30,7 @@ $$
 \dot{\phi}_{cmd} = \sum_{j \neq i} \left( F_{att}(d_{ij}) \sin(\psi_{ij}) + F_{ali}(d_{ij}) \sin(\Delta \phi_{ij}) \right) + F_{wall}
 $$
 
-Where interactions decay based on Lorentzian functions defined by the optimization parameters.
+Where interactions decay based on functions defined by the optimization parameters.
 
 ### Optimization Objective
 The Genetic Algorithm minimizes a composite cost function defined in `dynamics.py`:

@@ -49,7 +49,7 @@ def run_batch_gpu(genes):
     return cost_total
 
 def optimize_gpu():
-    print(f"--- GPU GA (Pop: {POP_SIZE_GPU}) | Minimizing Cost (Frozen Noise) ---")
+    print(f"--- GPU GA (Pop: {POP_SIZE_GPU}) | Minimizing Cost ---")
     
     genes = {
         'y_att':  cp.random.uniform(0.5, 5.0, (POP_SIZE_GPU, 1)),

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
-from config import DT, ARENA_RADIUS, W_EFFORT, W_DISP, W_POL, W_COLL
+from config import DT, ARENA_RADIUS, W_EFFORT, W_DISP, W_POL, W_COLL, NEIGHBORS
 
 @dataclass
 class SwarmParams:
@@ -37,7 +37,7 @@ def compute_derivatives(pos, phi, v, p, xp=np):
     y_att, y_ali, y_f = p.y_att, p.y_ali, p.y_f
     d0_att, l_att, l_ali = p.d0_att, p.l_att, p.l_ali
 
-    # Broadcast (Batch, N, 1)
+    # Broadcast (Batch, N, 1) => All in one calculus
     if hasattr(y_att, 'ndim') and y_att.ndim == 2:
         y_att, y_ali = y_att[..., None], y_ali[..., None]
         d0_att, l_att, l_ali = d0_att[..., None], l_att[..., None], l_ali[..., None]
@@ -78,7 +78,26 @@ def compute_derivatives(pos, phi, v, p, xp=np):
     w_ali = 1.0 / (1.0 + (d_ij / l_ali)**2)
     f_ali = y_ali * ((d_ij / d0_att) + 1.0) * w_ali * xp.sin(d_phi)
 
-    social_sum = xp.sum((f_att + f_ali) * (~eye_mask), axis=-1)
+    # NEIGHBORS logic
+    
+    if NEIGHBORS == 0:  # No interactions
+        social_sum = xp.zeros_like(phi)
+        
+    elif NEIGHBORS is None or NEIGHBORS >= (d_ij.shape[-1] - 1):    # All interactions
+        social_sum = xp.sum((f_att + f_ali) * (~eye_mask), axis=-1)
+        
+    else:   # Nominal case
+        d_topo = d_ij.copy()
+        
+        d_topo[eye_mask] = xp.inf # "self-distance" rejected
+        
+        k_idx = NEIGHBORS - 1
+        
+        threshold = xp.partition(d_topo, k_idx, axis=-1)[..., k_idx:k_idx+1] # partition is better than sort, we just want the k smallest, order doesn't matter
+        
+        top_k_mask = d_topo <= threshold
+        
+        social_sum = xp.sum((f_att + f_ali) * top_k_mask, axis=-1) # Filtered sum (by mask)
     
     # Noise & Dynamics
     noise = xp.random.uniform(-0.1, 0.1, size=phi.shape)

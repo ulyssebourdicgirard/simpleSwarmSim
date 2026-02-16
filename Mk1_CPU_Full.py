@@ -3,8 +3,12 @@ import os
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import config
 from matplotlib.patches import Circle
 from matplotlib.animation import FuncAnimation
+
+from logger import ExperimentLogger
+from visualization import generate_gif_from_log
 
 from config import NB_DRONES, ARENA_RADIUS, DT, SIM_STEPS, VISU_STEPS, POP_SIZE_CPU, GEN_CPU
 from dynamics import SwarmParams, compute_derivatives, get_deterministic_initial_state, compute_metrics
@@ -33,9 +37,13 @@ def run_simulation(params, steps=SIM_STEPS):
     return cost_total
 
 def optimize():
+    # Logger initialisation
+    logger = ExperimentLogger(mode="CPU")
+    logger.log_config(config)
+    
     # Detect cores (Safe margin -2)
     n_workers = max(1, (os.cpu_count() or 1) - 2)
-    print(f"--- CPU GA (Pop: {POP_SIZE_CPU}) | Workers: {n_workers} ---")
+    print(f"--- CPU GA (Pop: {POP_SIZE_CPU}) | Workers: {n_workers} | Log: {logger.log_dir} ---")
     
     # Init Pop
     pop = []
@@ -58,7 +66,9 @@ def optimize():
             sorted_idx = np.argsort(costs)
             best_idx = sorted_idx[0]
             
+            duration = time.time() - t0
             print(f"Gen {gen:02d} | Cost: {costs[best_idx]:.2f} | T: {time.time()-t0:.2f}s")
+            logger.log_generation(gen, costs[best_idx], duration, pop[best_idx])
             
             # Restore randomness for mutation
             np.random.seed(int(time.time() * 1000) % 2**32)
@@ -79,43 +89,46 @@ def optimize():
                 new_pop.append(child)
                 
             pop = new_pop
+    logger.close()
+    return pop[0], logger # Returning logger for path
 
-    return pop[0]
-
-def visualize(params):
-    print("\nVisualizing...")
+def generate_final_data(params, logger):
+    """
+    Runs the final simulation to feed into logs and visualization
+    """
+    print("\nGénération de la trajectoire finale (Machine Data)...")
+    # Seed reset
+    np.random.seed(42)
+    
     pos, phi, v = get_deterministic_initial_state(1, NB_DRONES, xp=np)
-    history = []
+    
+    history_pos = []
+    history_phi = []
+    history_v = []
     
     for _ in range(VISU_STEPS):
-        history.append((pos.copy(), phi.copy()))
+        # Current state
+        history_pos.append(pos.copy())
+        history_phi.append(phi.copy())
+        history_v.append(v.copy())
+        
         acc, phi_dot = compute_derivatives(pos, phi, v, params, xp=np)
         v   += acc * DT
         phi += phi_dot * DT
         pos[:, 0] += v * np.cos(phi) * DT
         pos[:, 1] += v * np.sin(phi) * DT
         
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.set_xlim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
-    ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
-    ax.add_patch(Circle((0, 0), ARENA_RADIUS, color='r', fill=False, ls='--'))
+    # Conversion to numpy arrays
+    full_pos = np.array(history_pos)
+    full_phi = np.array(history_phi)
+    full_v   = np.array(history_v)
     
-    title = f"CPU Result\nAtt: {params.y_att:.2f}, D0: {params.d0_att:.2f}"
-    ax.set_title(title)
-
-    pos0, phi0 = history[0]
-    quiver = ax.quiver(pos0[:, 0], pos0[:, 1], np.cos(phi0), np.sin(phi0), 
-                       color='dodgerblue', scale=25, width=0.005)
-
-    def update(frame):
-        p, h = history[frame]
-        quiver.set_offsets(p)
-        quiver.set_UVC(np.cos(h), np.sin(h))
-        return quiver,
-
-    ani = FuncAnimation(fig, update, frames=range(0, len(history), 3), interval=30, blit=True)
-    plt.show()
+    # Logging
+    logger.save_trajectory(full_pos, full_phi, full_v, params)
 
 if __name__ == "__main__":
-    best = optimize()
-    visualize(best)
+    best_params, logger = optimize()
+    
+    generate_final_data(best_params, logger)
+    
+    generate_gif_from_log(logger.log_dir)

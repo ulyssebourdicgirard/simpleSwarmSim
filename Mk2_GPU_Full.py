@@ -9,12 +9,12 @@ if os.path.exists(cuda_bin):
 
 import time
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
-from matplotlib.animation import FuncAnimation
+import config
 
 from config import NB_DRONES, ARENA_RADIUS, DT, SIM_STEPS, VISU_STEPS, POP_SIZE_GPU, GEN_GPU
 from dynamics import SwarmParams, compute_derivatives, get_deterministic_initial_state, compute_metrics
+from logger import ExperimentLogger
+from visualization import generate_gif_from_log
 
 try:
     import cupy as cp
@@ -49,7 +49,10 @@ def run_batch_gpu(genes):
     return cost_total
 
 def optimize_gpu():
-    print(f"--- GPU GA (Pop: {POP_SIZE_GPU}) | Minimizing Cost ---")
+    logger = ExperimentLogger(mode="GPU")
+    logger.log_config(config)
+    
+    print(f"--- GPU GA (Pop: {POP_SIZE_GPU}) | Log: {logger.log_dir} ---")
     
     genes = {
         'y_att':  cp.random.uniform(0.5, 5.0, (POP_SIZE_GPU, 1)),
@@ -99,57 +102,59 @@ def optimize_gpu():
         
         sorted_idx = cp.argsort(costs)
         best_idx = sorted_idx[0]
+        best_cost = float(costs[best_idx])
         
-        print(f"Gen {gen:02d} | Cost: {float(costs[best_idx]):.2f} | T: {dt:.2f}s")
+        print(f"Gen {gen:02d} | Cost: {best_cost:.2f} | T: {dt:.2f}s")
+        
+        best_gene_values = {}
+        for key in genes:
+            best_gene_values[key] = genes[key][best_idx].item()
+            
+        current_best = SwarmParams(**best_gene_values)
+        logger.log_generation(gen, best_cost, dt, current_best)
 
     best_idx = sorted_idx[0]
-    return SwarmParams(
-        y_att  = genes['y_att'][best_idx].item(),
-        d0_att = genes['d0_att'][best_idx].item(),
-        l_att  = genes['l_att'][best_idx].item(),
-        y_ali  = genes['y_ali'][best_idx].item(),
-        l_ali  = genes['l_ali'][best_idx].item(),
-        y_f    = genes['y_f'][best_idx].item()
-    )
-
-def visualize_result(params):
-    print("\nVisualizing (CPU)...")
     
-    # Deterministic init matching training
-    pos, phi, v = get_deterministic_initial_state(1, NB_DRONES, xp=np)
-    history = []
+    final_gene_values = {}
+    for key in genes:
+        final_gene_values[key] = genes[key][best_idx].item()
+        
+    final_params = SwarmParams(**final_gene_values)
+    
+    logger.close()
+    return final_params, logger
+
+def generate_final_data_gpu(params, logger):
+    print("\n[GPU] Generating final trajectory...")
+    cp.random.seed(42)
+    
+    # Dynamics returns (N, 2) when Batch=1, not (1, N, 2)
+    pos, phi, v = get_deterministic_initial_state(1, NB_DRONES, xp=cp)
+    
+    history_pos = []
+    history_phi = []
+    history_v = []
     
     for _ in range(VISU_STEPS): 
-        history.append((pos.copy(), phi.copy()))
-        acc, phi_dot = compute_derivatives(pos, phi, v, params, xp=np)
+        history_pos.append(pos.get())
+        history_phi.append(phi.get())
+        history_v.append(v.get())
+
+        acc, phi_dot = compute_derivatives(pos, phi, v, params, xp=cp)
         
         v   += acc * DT
         phi += phi_dot * DT
-        pos[:, 0] += v * np.cos(phi) * DT
-        pos[:, 1] += v * np.sin(phi) * DT
+        pos[..., 0] += v * cp.cos(phi) * DT
+        pos[..., 1] += v * cp.sin(phi) * DT
         
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.set_xlim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
-    ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
-    ax.add_patch(Circle((0, 0), ARENA_RADIUS, color='r', fill=False, ls='--'))
+    # Arrays are (Time, N, 2) or (Time, N) directly
+    full_pos = np.array(history_pos)
+    full_phi = np.array(history_phi)
+    full_v   = np.array(history_v)
     
-    title = (f"Optimized Result\n"
-             f"Att: {params.y_att:.2f}, Ali: {params.y_ali:.2f}, D0: {params.d0_att:.2f}")
-    ax.set_title(title)
-
-    pos0, phi0 = history[0]
-    quiver = ax.quiver(pos0[:, 0], pos0[:, 1], np.cos(phi0), np.sin(phi0), 
-                       color='dodgerblue', scale=25, width=0.005)
-
-    def update(frame):
-        p, h = history[frame]
-        quiver.set_offsets(p)
-        quiver.set_UVC(np.cos(h), np.sin(h))
-        return quiver,
-
-    ani = FuncAnimation(fig, update, frames=range(0, len(history), 3), interval=30, blit=True)
-    plt.show()
+    logger.save_trajectory(full_pos, full_phi, full_v, params)
 
 if __name__ == "__main__":
-    best_p = optimize_gpu()
-    visualize_result(best_p)
+    best_p, logger = optimize_gpu()
+    generate_final_data_gpu(best_p, logger)
+    generate_gif_from_log(logger.log_dir)

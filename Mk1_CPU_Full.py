@@ -31,8 +31,8 @@ def run_simulation(params, steps=SIM_STEPS):
         
         # Accumulate metrics (Post-Transient)
         if t > 50:
-            c_disp, c_effort, c_coll, c_pol = compute_metrics(pos, phi, phi_dot, xp=np)
-            cost_total += c_disp + c_effort + c_coll + c_pol
+            c_disp, c_effort, c_coll, c_pol, c_mill = compute_metrics(pos, phi, phi_dot, v, xp=np)
+            cost_total += c_disp + c_effort + c_coll + c_pol + c_mill
             
     return cost_total
 

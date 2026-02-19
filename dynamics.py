@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
-from config import DT, ARENA_RADIUS, W_EFFORT, W_DISP, W_POL, W_COLL, NEIGHBORS
+from config import DT, ARENA_RADIUS, W_EFFORT, W_DISP, W_POL, W_COLL, W_MILL, NEIGHBORS, COLLISION_DIST
 
 @dataclass
 class SwarmParams:
@@ -78,35 +78,41 @@ def compute_derivatives(pos, phi, v, p, xp=np):
     w_ali = 1.0 / (1.0 + (d_ij / l_ali)**2)
     f_ali = y_ali * ((d_ij / d0_att) + 1.0) * w_ali * xp.sin(d_phi)
 
+    # Collision avoidance (Exponential barrier)
+    f_rep = -20.0 * xp.exp(5.0 * (COLLISION_DIST - d_ij)) * xp.sin(psi)
+    f_rep = 0# Disabled because of bad effects
+
     # NEIGHBORS logic
-    
-    if NEIGHBORS == 0:  # No interactions
+    if NEIGHBORS == 0:  
         social_sum = xp.zeros_like(phi)
+        rep_sum = xp.zeros_like(phi)
         
-    elif NEIGHBORS is None or NEIGHBORS >= (d_ij.shape[-1] - 1):    # All interactions
+    elif NEIGHBORS is None or NEIGHBORS >= (d_ij.shape[-1] - 1):    
         social_sum = xp.sum((f_att + f_ali) * (~eye_mask), axis=-1)
+        rep_sum = xp.sum(f_rep * (~eye_mask), axis=-1)
         
-    else:   # Nominal case
+    else:   
         d_topo = d_ij.copy()
-        
-        d_topo[eye_mask] = xp.inf # "self-distance" rejected
-        
+        d_topo[eye_mask] = xp.inf 
         k_idx = NEIGHBORS - 1
-        
-        threshold = xp.partition(d_topo, k_idx, axis=-1)[..., k_idx:k_idx+1] # partition is better than sort, we just want the k smallest, order doesn't matter
-        
+        threshold = xp.partition(d_topo, k_idx, axis=-1)[..., k_idx:k_idx+1] 
         top_k_mask = d_topo <= threshold
         
-        social_sum = xp.sum((f_att + f_ali) * top_k_mask, axis=-1) # Filtered sum (by mask)
+        social_sum = xp.sum((f_att + f_ali) * top_k_mask, axis=-1)
+        rep_sum = xp.sum(f_rep * top_k_mask, axis=-1)
     
     # Noise & Dynamics
-    noise = xp.random.uniform(-0.1, 0.1, size=phi.shape)
-    phi_dot = xp.clip(social_sum + w_force + noise, -3.0, 3.0)
+    noise = xp.random.uniform(-0.1, 0.1, size=phi.shape[-1])
+    
+    phi_dot_social = xp.clip(social_sum + noise, -3.0, 3.0)
+    phi_dot_vital = xp.clip(rep_sum + w_force, -10.0, 10.0)
+    
+    phi_dot = phi_dot_social + phi_dot_vital
     acc = y_f * (1.0 - v)
 
     return acc, phi_dot
 
-def compute_metrics(pos, phi, phi_dot, xp=np):
+def compute_metrics(pos, phi, phi_dot, v, xp=np):
     """
     Centralized Cost Function Logic.
     Handles both CPU (N, 2) and GPU (Batch, N, 2) arrays.
@@ -115,22 +121,22 @@ def compute_metrics(pos, phi, phi_dot, xp=np):
     is_batch = (pos.ndim == 3)
     axis_agent = 1 if is_batch else 0
     
-    # 1. Effort: Minimize turn rate
+    # Effort: Minimize turn rate
     c_effort = xp.sum(xp.abs(phi_dot), axis=axis_agent) * W_EFFORT
     
-    # 2. Dispersion: Target 5.0m from center
+    # Dispersion: Target 5.0m from center
     center = xp.mean(pos, axis=axis_agent, keepdims=True)
     d_center = xp.linalg.norm(pos - center, axis=-1)
     # Mean distance of agents to swarm center
     c_disp = xp.abs(xp.mean(d_center, axis=axis_agent) - 5.0) * W_DISP
     
-    # 3. Polarization: Maximize alignment (minimize 1 - Pol)
-    u = xp.cos(phi)
-    v = xp.sin(phi)
-    pol = xp.sqrt(xp.mean(u, axis=axis_agent)**2 + xp.mean(v, axis=axis_agent)**2)
+    # Polarization: Maximize alignment (minimize 1 - Pol)
+    u_vec = xp.cos(phi)
+    v_vec = xp.sin(phi)
+    pol = xp.sqrt(xp.mean(u_vec, axis=axis_agent)**2 + xp.mean(v_vec, axis=axis_agent)**2)
     c_pol = (1.0 - pol) * W_POL
     
-    # 4. Collisions: Distance < 0.6m
+    # Collisions: Distance < 0.6m
     if is_batch:
         r_ij = pos[:, :, None, :] - pos[:, None, :, :] # (B, N, N, 2)
     else:
@@ -148,7 +154,20 @@ def compute_metrics(pos, phi, phi_dot, xp=np):
     
     # Count collisions (symmetric matrix, so divide count by 2)
     sum_axes = (1, 2) if is_batch else (0, 1)
-    n_coll = xp.sum(d_ij < 0.6, axis=sum_axes) / 2.0
+    n_coll = xp.sum(d_ij < COLLISION_DIST, axis=sum_axes) / 2.0
     c_coll = n_coll * W_COLL
+    vel_x = v * xp.cos(phi)
+    vel_y = v * xp.sin(phi)
+    vel = xp.stack([vel_x, vel_y], axis=-1)
     
-    return c_disp, c_effort, c_coll, c_pol
+    vel_bary = xp.mean(vel, axis=axis_agent, keepdims=True)
+    dvel = vel - vel_bary
+    dpos = pos - center
+    
+    theta = xp.arctan2(dpos[..., 1], dpos[..., 0])
+    phi_vel = xp.arctan2(dvel[..., 1], dvel[..., 0])
+    
+    mill = xp.abs(xp.mean(xp.sin(theta - phi_vel), axis=axis_agent))
+    c_mill = mill * W_MILL
+    
+    return c_disp, c_effort, c_coll, c_pol, c_mill

@@ -43,8 +43,8 @@ def run_batch_gpu(genes):
         
         # Accumulate metrics (Post-Transient)
         if t > 50:
-            c_disp, c_effort, c_coll, c_pol = compute_metrics(pos, phi, phi_dot, xp=cp)
-            cost_total += c_disp + c_effort + c_coll + c_pol
+            c_disp, c_effort, c_coll, c_pol, c_mill = compute_metrics(pos, phi, phi_dot, v, xp=cp)
+            cost_total += c_disp + c_effort + c_coll + c_pol + c_mill
 
     return cost_total
 
@@ -67,19 +67,29 @@ def optimize_gpu():
 
     n_keep = int(0.2 * POP_SIZE_GPU)
     
-    # Init Eval
-    costs = run_batch_gpu(genes)
-    sorted_idx = cp.argsort(costs)
+    sorted_idx = cp.arange(POP_SIZE_GPU)
     
     for gen in range(GEN_GPU):
         t0 = time.time()
         
-        if gen < GEN_GPU:
-            # Randomness for mutation
+        costs = run_batch_gpu(genes)
+        cp.cuda.Stream.null.synchronize()
+        dt = time.time() - t0
+        
+        sorted_idx = cp.argsort(costs)
+        best_idx = sorted_idx[0]
+        best_cost = float(costs[best_idx])
+        
+        print(f"Gen {gen:02d} | Cost: {best_cost:.2f} | T: {dt:.2f}s")
+        
+        best_gene_values = {k: genes[k][best_idx].item() for k in genes}
+        current_best = SwarmParams(**best_gene_values)
+        logger.log_generation(gen, best_cost, dt, current_best)
+
+        if gen < GEN_GPU - 1:
             cp.random.seed(int(time.time() * 1000) % 2**32)
             
             survivors = sorted_idx[:n_keep]
-            
             best_idx_arr = sorted_idx[:1]
             parents = survivors[cp.random.randint(0, n_keep, POP_SIZE_GPU - 1)]
             fill_idx = cp.concatenate((best_idx_arr, parents))
@@ -95,31 +105,7 @@ def optimize_gpu():
                 genes[k] = cp.maximum(0.1, genes[k])
                 if k == 'd0_att': genes[k] = cp.maximum(0.5, genes[k])
 
-        # Eval
-        costs = run_batch_gpu(genes)
-        cp.cuda.Stream.null.synchronize()
-        dt = time.time() - t0
-        
-        sorted_idx = cp.argsort(costs)
-        best_idx = sorted_idx[0]
-        best_cost = float(costs[best_idx])
-        
-        print(f"Gen {gen:02d} | Cost: {best_cost:.2f} | T: {dt:.2f}s")
-        
-        best_gene_values = {}
-        for key in genes:
-            best_gene_values[key] = genes[key][best_idx].item()
-            
-        current_best = SwarmParams(**best_gene_values)
-        logger.log_generation(gen, best_cost, dt, current_best)
-
-    best_idx = sorted_idx[0]
-    
-    final_gene_values = {}
-    for key in genes:
-        final_gene_values[key] = genes[key][best_idx].item()
-        
-    final_params = SwarmParams(**final_gene_values)
+    final_params = SwarmParams(**{k: genes[k][sorted_idx[0]].item() for k in genes})
     
     logger.close()
     return final_params, logger

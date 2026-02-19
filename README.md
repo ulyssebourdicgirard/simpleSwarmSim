@@ -36,13 +36,14 @@ Where interactions decay based on functions defined by the optimization paramete
 The Genetic Algorithm minimizes a composite cost function defined in `dynamics.py`:
 
 $$
-J = w_{disp} | \bar{r} - r_{target} | + w_{effort} \sum |\dot{\phi}| + w_{pol} (1 - \Psi) + w_{coll} N_{coll}
+J = w_{disp} | \bar{r} - r_{target} | + w_{effort} \sum |\dot{\phi}| + w_{pol} (1 - \Psi) + w_{coll} N_{coll} + w_{mill} M
 $$
 
 * **Dispersion**: Maintains a specific swarm radius ($r_{target} = 5.0m$).
 * **Effort**: Penalizes high turn rates to ensure smooth trajectories.
 * **Polarization ($\Psi$)**: Maximizes velocity alignment (0 to 1).
 * **Collision**: Heavily penalizes inter-agent distances below 0.6m.
+* **Milling ($M$)**: Rewards collective circular motion around the barycenter.
 
 To ensure convergence, the evaluation phase uses **Frozen Noise** (fixed random seed), guaranteeing that score improvements are due to better parameters rather than stochastic variance.
 
@@ -75,4 +76,5 @@ W_EFFORT
 W_DISP 
 W_POL 
 W_COLL
+W_MILL
 ```

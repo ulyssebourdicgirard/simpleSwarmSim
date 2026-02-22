@@ -6,19 +6,31 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from config import ARENA_RADIUS, NEIGHBORS
 
 def generate_interactive_html(log_path, pos, phi, vz, params):
-    import plotly.graph_objects as go
+    import sys
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        print(f"\n[Visu] Avertissement : Plotly n'est pas installé dans cet environnement.")
+        print(f"[Visu] Interpréteur utilisé : {sys.executable}")
+        print(f"[Visu] Le rendu HTML interactif a été ignoré, mais votre GIF est prêt.")
+        return
 
     suffix = "3D"
     output_html = os.path.join(log_path, f"animation_{suffix}_interactive.html")
     
-    step = 4
+    step = 4    # Divides number of frames by 4
     pos_sub = pos[::step]
     phi_sub = phi[::step]
     vz_sub = vz[::step]
 
-    u_init = np.cos(phi_sub[0])
-    v_init = np.sin(phi_sub[0])
-    w_init = vz_sub[0]
+    u_raw = np.cos(phi_sub[0])
+    v_raw = np.sin(phi_sub[0])
+    w_raw = vz_sub[0]
+    
+    mag_init = np.sqrt(u_raw**2 + v_raw**2 + w_raw**2)
+    u_init = u_raw / mag_init
+    v_init = v_raw / mag_init
+    w_init = w_raw / mag_init
 
     fig = go.Figure(
         data=[go.Cone(
@@ -38,14 +50,23 @@ def generate_interactive_html(log_path, pos, phi, vz, params):
 
     frames = []
     for t in range(len(pos_sub)):
+        u_t_raw = np.cos(phi_sub[t])
+        v_t_raw = np.sin(phi_sub[t])
+        w_t_raw = vz_sub[t]
+        
+        mag_t = np.sqrt(u_t_raw**2 + v_t_raw**2 + w_t_raw**2)
+        
         frames.append(go.Frame(
             data=[go.Cone(
                 x=pos_sub[t, :, 0],
                 y=pos_sub[t, :, 1],
                 z=pos_sub[t, :, 2],
-                u=np.cos(phi_sub[t]),
-                v=np.sin(phi_sub[t]),
-                w=vz_sub[t]
+                u=u_t_raw / mag_t,
+                v=v_t_raw / mag_t,
+                w=w_t_raw / mag_t,
+                sizemode="absolute",
+                sizeref=2.0,
+                anchor="tail"
             )],
             name=str(t)
         ))
@@ -57,7 +78,7 @@ def generate_interactive_html(log_path, pos, phi, vz, params):
         yanchor="top",
         xanchor="left",
         currentvalue=dict(font=dict(size=14), prefix="Frame : ", visible=True, xanchor="right"),
-        transition=dict(duration=0), # 0 pour éviter le lag d'interpolation
+        transition=dict(duration=0), 
         pad=dict(b=10, t=50),
         len=0.9,
         x=0.1,
@@ -71,7 +92,7 @@ def generate_interactive_html(log_path, pos, phi, vz, params):
 
     fig.update_layout(
         title=f"Replay Interactif 3D : y_att={params.get('y_att', 0):.2f}",
-        uirevision='constant', # --- LE FIX DE LA CAMERA MAGIQUE ---
+        uirevision='constant', 
         scene=dict(
             xaxis=dict(range=[-ARENA_RADIUS, ARENA_RADIUS]),
             yaxis=dict(range=[-ARENA_RADIUS, ARENA_RADIUS]),

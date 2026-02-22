@@ -59,15 +59,15 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
         y_att, y_ali = y_att[..., None], y_ali[..., None]
         d0_att, l_att, l_ali = d0_att[..., None], l_att[..., None], l_ali[..., None]
 
-    # --- Wall Interaction (Exp) ---
-    dist_center = xp.linalg.norm(pos, axis=-1)
+    # --- Wall Interaction (Cylindrical Arena) ---
+    dist_xy = xp.linalg.norm(pos[..., 0:2], axis=-1) if config.ENABLE_3D else xp.linalg.norm(pos, axis=-1)
     
     # Heading error rel. to center
     angle_to_center = xp.arctan2(-pos[..., 1], -pos[..., 0])
     psi_center = (angle_to_center - phi + xp.pi) % (2 * xp.pi) - xp.pi
     
-    # Exponential repulsion: F ~ 0 at 4m, F >> 1 at 0m
-    w_force = 100.0 * xp.exp(2.0 * (dist_center - ARENA_RADIUS)) * xp.sin(psi_center)
+    # Exponential repulsion
+    w_force = 100.0 * xp.exp(2.0 * (dist_xy - ARENA_RADIUS)) * xp.sin(psi_center)
 
     # --- Social Interaction ---
     pos_i = xp.expand_dims(pos, -2) 
@@ -102,9 +102,8 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     w_ali = 1.0 / (1.0 + (d_ij / l_ali)**2)
     f_ali = y_ali * ((d_ij / d0_att) + 1.0) * w_ali * xp.sin(d_phi)
 
-    # Collision avoidance (Exponential barrier)
-    f_rep = -20.0 * xp.exp(5.0 * (COLLISION_DIST - d_ij)) * xp.sin(psi)
-    f_rep = 0# Disabled because of bad effects
+    # Collision avoidance
+    f_rep = 0 # Disabled because of bad effects
 
     # NEIGHBORS logic
     if NEIGHBORS == 0:  

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import numpy as np
 import config
-from config import DT, ARENA_RADIUS, W_EFFORT, W_DISP, W_POL, W_COLL, W_MILL, NEIGHBORS, COLLISION_DIST
+from config import DT, ARENA_RADIUS, W_EFFORT, W_DISP, W_POL, W_COLL, W_MILL, NEIGHBORS, COLLISION_DIST, Z_MIN, Z_MAX
 
 @dataclass
 class SwarmParams:
@@ -19,6 +19,8 @@ class SwarmParams:
     a_z: float = 1.0
     d0_z: float = 0.5
     sigma_z: float = 1.0 
+    y_z_w: float = 2.0
+    dz_w: float = 1.0
 
 def get_deterministic_initial_state(n_batch, n_drones, xp=np):
     # Circle layout (Deterministic)
@@ -38,7 +40,7 @@ def get_deterministic_initial_state(n_batch, n_drones, xp=np):
     
     if config.ENABLE_3D:
         # Added Z axis
-        z = xp.random.uniform(2.0, 8.0, size=theta.shape)
+        z = xp.random.uniform(config.Z_MIN + 1.0, config.Z_MAX - 1.0, size=theta.shape)
         pos = xp.stack([x, y, z], axis=-1)
         vz = xp.zeros_like(theta)
         return pos, phi, v, vz
@@ -135,16 +137,25 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     vz_dot = 0.0
     if config.ENABLE_3D and vz is not None:
         
+        # Social vertical alignment
         dz_ij = pos_j[..., 2] - pos_i[..., 2]
-        
         term_tanh = xp.tanh((dz_ij - xp.sign(dz_ij) * p.d0_z) / p.a_z)
         term_exp = xp.exp(-(d_ij / p.l_z)**2)
         f_vz = p.y_z * term_tanh * term_exp
         
         if NEIGHBORS == 0:
-            vz_dot = xp.zeros_like(vz)
+            vz_dot_social = xp.zeros_like(vz)
         else:
-            vz_dot = xp.sum(f_vz * (~eye_mask), axis=-1)
+            vz_dot_social = xp.sum(f_vz * (~eye_mask), axis=-1)
+            
+        # Floor & Ceiling interactions
+        dz_floor = pos[..., 2] - config.Z_MIN
+        f_floor = 2.0 * p.y_z_w / (1.0 + xp.exp((dz_floor - p.dz_w) / p.dz_w))
+        
+        dz_ceil = config.Z_MAX - pos[..., 2]
+        f_ceil = -2.0 * p.y_z_w / (1.0 + xp.exp((dz_ceil - p.dz_w) / p.dz_w))
+        
+        vz_dot = vz_dot_social + f_floor + f_ceil
     
     if config.ENABLE_3D:
         return acc, phi_dot, vz_dot

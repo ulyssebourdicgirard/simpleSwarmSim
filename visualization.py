@@ -6,10 +6,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 from config import ARENA_RADIUS, NEIGHBORS
 
 def generate_interactive_html(log_path, pos, phi, vz, params):
-    try:
-        import plotly.graph_objects as go
-    except ImportError:
-        return
+    import plotly.graph_objects as go
 
     suffix = "3D"
     output_html = os.path.join(log_path, f"animation_{suffix}_interactive.html")
@@ -55,8 +52,26 @@ def generate_interactive_html(log_path, pos, phi, vz, params):
     
     fig.frames = frames
 
+    sliders = [dict(
+        active=0,
+        yanchor="top",
+        xanchor="left",
+        currentvalue=dict(font=dict(size=14), prefix="Frame : ", visible=True, xanchor="right"),
+        transition=dict(duration=0), # 0 pour éviter le lag d'interpolation
+        pad=dict(b=10, t=50),
+        len=0.9,
+        x=0.1,
+        y=0,
+        steps=[dict(
+            args=[[str(k)], dict(frame=dict(duration=0, redraw=True), transition=dict(duration=0), mode="immediate")],
+            label=str(k * step), 
+            method="animate"
+        ) for k in range(len(pos_sub))]
+    )]
+
     fig.update_layout(
         title=f"Replay Interactif 3D : y_att={params.get('y_att', 0):.2f}",
+        uirevision='constant', # --- LE FIX DE LA CAMERA MAGIQUE ---
         scene=dict(
             xaxis=dict(range=[-ARENA_RADIUS, ARENA_RADIUS]),
             yaxis=dict(range=[-ARENA_RADIUS, ARENA_RADIUS]),
@@ -66,12 +81,31 @@ def generate_interactive_html(log_path, pos, phi, vz, params):
         ),
         updatemenus=[dict(
             type="buttons",
-            buttons=[dict(
-                label="Play",
-                method="animate",
-                args=[None, dict(frame=dict(duration=50, redraw=True), fromcurrent=True)]
-            )]
-        )]
+            showactive=False,
+            y=0,
+            x=0.05,
+            xanchor="right",
+            yanchor="top",
+            pad=dict(t=50, r=10),
+            buttons=[
+                dict(
+                    label="Play (Normale)",
+                    method="animate",
+                    args=[None, dict(frame=dict(duration=100, redraw=True), transition=dict(duration=0), fromcurrent=True, mode="immediate")]
+                ),
+                dict(
+                    label="Play (Rapide)",
+                    method="animate",
+                    args=[None, dict(frame=dict(duration=20, redraw=True), transition=dict(duration=0), fromcurrent=True, mode="immediate")]
+                ),
+                dict(
+                    label="Pause",
+                    method="animate",
+                    args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate", transition=dict(duration=0))]
+                )
+            ]
+        )],
+        sliders=sliders
     )
 
     fig.write_html(output_html)

@@ -1,6 +1,7 @@
 import os
 
 # Env / Physics
+ENABLE_3D = True    # True: 3D, False: 2D
 DT = 0.1                
 ARENA_RADIUS = 50.0
 NB_DRONES = 20          

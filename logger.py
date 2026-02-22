@@ -5,22 +5,25 @@ import numpy as np
 
 class ExperimentLogger:
     def __init__(self, mode="CPU"):
+        import config
+        self.suffix = "3D" if config.ENABLE_3D else "2D"
+        
         # Timestamp
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.log_dir = os.path.join("logs", f"{timestamp}_{mode}")
+        self.log_dir = os.path.join("logs", f"{timestamp}_{mode}_{self.suffix}")
         os.makedirs(self.log_dir, exist_ok=True)
         
         # Files
-        self.report_path = os.path.join(self.log_dir, "report.md")
-        self.trajectory_path = os.path.join(self.log_dir, "trajectory.npz")
+        self.report_path = os.path.join(self.log_dir, f"report_{self.suffix}.md")
+        self.trajectory_path = os.path.join(self.log_dir, f"trajectory_{self.suffix}.npz")
         
         # Init Markdown Header
         with open(self.report_path, 'w', encoding='utf-8') as f:
-            f.write(f"# Experiment Report - {mode}\n")
+            f.write(f"# Experiment Report - {mode} ({self.suffix})\n")
             f.write(f"**Date:** {timestamp}\n\n")
             f.write("## 1. Initial Configuration\n")
             f.write("| Parameter | Value |\n")
-            f.write("| :--- | :--- |\n") 
+            f.write("| :--- | :--- |\n")
             
     def log_config(self, config_module):
         """Log constants from config.py"""
@@ -57,7 +60,7 @@ class ExperimentLogger:
             line = f"| {gen:02d}   | {cost:<12.4f} | {duration:<10.2f} | {params_str:<140} |\n"
             f.write(line)
     
-    def save_trajectory(self, pos, phi, v, params):
+    def save_trajectory(self, pos, phi, v, params, vz=None):
         """
         C (NPZ Format): Saves the complete trajectory for replay.
         Data must be numpy arrays (not lists, not cupy).
@@ -65,12 +68,19 @@ class ExperimentLogger:
         # We also save the final parameters in the npz for machine reference
         param_dict = params.__dict__
         
+        save_data = {
+            'pos': pos,
+            'phi': phi,
+            'v': v,
+            'params': param_dict
+        }
+        
+        if vz is not None:
+            save_data['vz'] = vz
+            
         np.savez_compressed(
             self.trajectory_path,
-            pos=pos,
-            phi=phi,
-            v=v,
-            params=param_dict
+            **save_data
         )
         print(f"\n[Logger] Trajectory saved: {self.trajectory_path}")
         return self.trajectory_path

@@ -17,17 +17,21 @@ def run_simulation(params, steps=SIM_STEPS):
     # Deterministic Seed (Frozen Noise)
     np.random.seed(42)
     
-    pos, phi, v = get_deterministic_initial_state(1, NB_DRONES, xp=np)
+    pos, phi, v, vz = get_deterministic_initial_state(1, NB_DRONES, xp=np)
     
     cost_total = 0.0
 
     for t in range(steps):
-        acc, phi_dot = compute_derivatives(pos, phi, v, params, xp=np)
+        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, xp=np)
         
         v   += acc * DT
         phi += phi_dot * DT
         pos[:, 0] += v * np.cos(phi) * DT
         pos[:, 1] += v * np.sin(phi) * DT
+        
+        if vz is not None and vz_dot is not None:
+            vz += vz_dot * DT
+            pos[:, 2] += vz * DT
         
         # Accumulate metrics (Post-Transient)
         if t > 50:
@@ -100,31 +104,40 @@ def generate_final_data(params, logger):
     # Seed reset
     np.random.seed(42)
     
-    pos, phi, v = get_deterministic_initial_state(1, NB_DRONES, xp=np)
+    pos, phi, v, vz = get_deterministic_initial_state(1, NB_DRONES, xp=np)
     
     history_pos = []
     history_phi = []
     history_v = []
+    history_vz = []
     
     for _ in range(VISU_STEPS):
         # Current state
         history_pos.append(pos.copy())
         history_phi.append(phi.copy())
         history_v.append(v.copy())
+        if vz is not None:
+            history_vz.append(vz.copy())
         
-        acc, phi_dot = compute_derivatives(pos, phi, v, params, xp=np)
+        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, xp=np)
+            
         v   += acc * DT
         phi += phi_dot * DT
         pos[:, 0] += v * np.cos(phi) * DT
         pos[:, 1] += v * np.sin(phi) * DT
         
+        if vz is not None and vz_dot is not None:
+            vz += vz_dot * DT
+            pos[:, 2] += vz * DT
+        
     # Conversion to numpy arrays
     full_pos = np.array(history_pos)
     full_phi = np.array(history_phi)
     full_v   = np.array(history_v)
+    full_vz  = np.array(history_vz) if vz is not None else None
     
     # Logging
-    logger.save_trajectory(full_pos, full_phi, full_v, params)
+    logger.save_trajectory(full_pos, full_phi, full_v, params, vz=full_vz)
 
 if __name__ == "__main__":
     best_params, logger = optimize()

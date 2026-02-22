@@ -1,6 +1,8 @@
 # Drone Swarm Optimization Prototype
 
-This repository contains a Python prototype for optimizing autonomous drone swarm behaviors. It implements a particle-based simulation where interaction rules, attraction, alignment, and repulsion, are tuned using a Genetic Algorithm (GA).
+# Drone Swarm Optimization Prototype
+
+This repository contains a Python prototype for optimizing autonomous drone swarm behaviors. It implements a particle-based simulation where interaction rules, attraction, alignment, and repulsion, are tuned using a Genetic Algorithm (GA). The system natively supports both **2D and 3D simulations**.
 
 The project provides two mathematically equivalent implementations:
 1. **CPU Baseline (`Mk1`)**: Uses NumPy and multiprocessing.
@@ -11,11 +13,13 @@ The project provides two mathematically equivalent implementations:
 The system is designed to ensure strict consistency between CPU and GPU results by centralizing the physics and evaluation logic.
 
 ### Core Modules
-* `config.py`: Defines global constants for the environment (timestep, arena size, drone count) and optimization weights.
+* `config.py`: Defines global constants for the environment (timestep, arena size, drone count), the dimensionality toggle (`ENABLE_3D`), and optimization weights.
 * `dynamics.py`: Implements the physics engine and cost function. It handles:
     * **Forces**: Attraction/repulsion and heading alignment.
+    * **Vertical Dynamics**: Altitude alignment and social distance coupling (when 3D is enabled).
     * **Constraints**: Soft-boundary wall repulsion.
     * **Metrics**: Calculation of Dispersion, Control Effort, Polarization, and Collisions.
+* `logger.py` & `visualization.py`: Automatically adapt to the dimensionality to save simulation states and generate either 2D vector fields or 3D animated plots.
 
 ### Solvers
 * `Mk1_CPU_Full.py`: Executes the GA on the CPU. It utilizes `multiprocessing.Pool` to parallelize the evaluation of swarm candidates across available cores.
@@ -24,13 +28,17 @@ The system is designed to ensure strict consistency between CPU and GPU results 
 ## Technical Details
 
 ### Physics Model
-Agents follow first-order unicycle dynamics. The angular velocity command $\dot{\phi}$ is derived from the weighted sum of social forces:
+Agents follow first-order unicycle dynamics on the horizontal plane, optionally augmented with vertical dynamics. 
+
+The horizontal angular velocity command $\dot{\phi}$ is derived from the weighted sum of social forces:
 
 $$
 \dot{\phi}_{cmd} = \sum_{j \neq i} \left( F_{att}(d_{ij}) \sin(\psi_{ij}) + F_{ali}(d_{ij}) \sin(\Delta \phi_{ij}) \right) + F_{wall}
 $$
 
-Where interactions decay based on functions defined by the optimization parameters.
+Where interactions decay based on functions defined by the optimization parameters. 
+
+When `ENABLE_3D` is active, the vertical velocity command $\dot{v}_z$ is governed by a hyperbolic tangent function for altitude alignment and exponential decay for social distance, directly inspired by 3D swarm mechanics.
 
 ### Optimization Objective
 The Genetic Algorithm minimizes a composite cost function defined in `dynamics.py`:
@@ -72,6 +80,7 @@ python Mk2_GPU_Full.py
 Simulation parameters and cost function weights can be modified in config.py:
 
 ```python
+ENABLE_3D = True   # Toggles between 3D and 2D simulation
 W_EFFORT 
 W_DISP 
 W_POL 

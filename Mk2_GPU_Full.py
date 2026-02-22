@@ -25,7 +25,7 @@ def run_batch_gpu(genes):
     # FROZEN NOISE
     cp.random.seed(42)
     
-    pos, phi, v = get_deterministic_initial_state(genes['y_att'].shape[0], NB_DRONES, xp=cp)
+    pos, phi, v, vz = get_deterministic_initial_state(genes['y_att'].shape[0], NB_DRONES, xp=cp)
     
     params = SwarmParams(**genes)
     
@@ -33,13 +33,17 @@ def run_batch_gpu(genes):
     cost_total = cp.zeros(n_batch)
 
     for t in range(SIM_STEPS):
-        acc, phi_dot = compute_derivatives(pos, phi, v, params, xp=cp)
+        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, xp=cp)
         
         # Integration
         v   += acc * DT
         phi += phi_dot * DT
         pos[..., 0] += v * cp.cos(phi) * DT
         pos[..., 1] += v * cp.sin(phi) * DT
+        
+        if vz is not None and vz_dot is not None:
+            vz += vz_dot * DT
+            pos[..., 2] += vz * DT
         
         # Accumulate metrics (Post-Transient)
         if t > 50:
@@ -115,30 +119,38 @@ def generate_final_data_gpu(params, logger):
     cp.random.seed(42)
     
     # Dynamics returns (N, 2) when Batch=1, not (1, N, 2)
-    pos, phi, v = get_deterministic_initial_state(1, NB_DRONES, xp=cp)
+    pos, phi, v, vz = get_deterministic_initial_state(1, NB_DRONES, xp=cp)
     
     history_pos = []
     history_phi = []
     history_v = []
+    history_vz = []
     
     for _ in range(VISU_STEPS): 
         history_pos.append(pos.get())
         history_phi.append(phi.get())
         history_v.append(v.get())
+        if vz is not None:
+            history_vz.append(vz.get())
 
-        acc, phi_dot = compute_derivatives(pos, phi, v, params, xp=cp)
+        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, xp=cp)
         
         v   += acc * DT
         phi += phi_dot * DT
         pos[..., 0] += v * cp.cos(phi) * DT
         pos[..., 1] += v * cp.sin(phi) * DT
         
+        if vz is not None and vz_dot is not None:
+            vz += vz_dot * DT
+            pos[..., 2] += vz * DT
+        
     # Arrays are (Time, N, 2) or (Time, N) directly
     full_pos = np.array(history_pos)
     full_phi = np.array(history_phi)
     full_v   = np.array(history_v)
+    full_vz  = np.array(history_vz) if vz is not None else None
     
-    logger.save_trajectory(full_pos, full_phi, full_v, params)
+    logger.save_trajectory(full_pos, full_phi, full_v, params, vz=full_vz)
 
 if __name__ == "__main__":
     best_p, logger = optimize_gpu()

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
+import config
 from config import DT, ARENA_RADIUS, W_EFFORT, W_DISP, W_POL, W_COLL, W_MILL, NEIGHBORS, COLLISION_DIST
 
 @dataclass
@@ -11,11 +12,17 @@ class SwarmParams:
     l_att: float
     l_ali: float
     alpha_att: float = 1.0 
-    alpha_ali: float = 0.0  
+    alpha_ali: float = 0.0 
+    # 3D Parameters
+    y_z: float = 1.0
+    l_z: float = 3.0
+    a_z: float = 1.0
+    d0_z: float = 0.5
+    sigma_z: float = 1.0 
 
 def get_deterministic_initial_state(n_batch, n_drones, xp=np):
     # Circle layout (Deterministic)
-    radius = 6.0
+    radius = ARENA_RADIUS//2
     theta = xp.linspace(0, 2*xp.pi, n_drones, endpoint=False)
     
     # Broadcast (Batch, N)
@@ -26,13 +33,21 @@ def get_deterministic_initial_state(n_batch, n_drones, xp=np):
     y = radius * xp.sin(theta)
     
     # State vectors
-    pos = xp.stack([x, y], axis=-1)
     phi = theta + 0.1 # Outward looking + offset
     v = xp.zeros_like(theta)
     
-    return pos, phi, v
+    if config.ENABLE_3D:
+        # Added Z axis
+        z = xp.random.uniform(2.0, 8.0, size=theta.shape)
+        pos = xp.stack([x, y, z], axis=-1)
+        vz = xp.zeros_like(theta)
+        return pos, phi, v, vz
+    else:
+        # 2D version
+        pos = xp.stack([x, y], axis=-1)
+        return pos, phi, v, None
 
-def compute_derivatives(pos, phi, v, p, xp=np):
+def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     # Unpack
     y_att, y_ali, y_f = p.y_att, p.y_ali, p.y_f
     d0_att, l_att, l_ali = p.d0_att, p.l_att, p.l_ali
@@ -50,15 +65,22 @@ def compute_derivatives(pos, phi, v, p, xp=np):
     psi_center = (angle_to_center - phi + xp.pi) % (2 * xp.pi) - xp.pi
     
     # Exponential repulsion: F ~ 0 at 4m, F >> 1 at 0m
-    # 100 * exp(-8) ~= 0.033 (Negligible at 4m)
-    # 100 * exp(0)   = 100.0 (Saturates at contact)
     w_force = 100.0 * xp.exp(2.0 * (dist_center - ARENA_RADIUS)) * xp.sin(psi_center)
 
     # --- Social Interaction ---
     pos_i = xp.expand_dims(pos, -2) 
     pos_j = xp.expand_dims(pos, -3)
+    
     r_ij = pos_i - pos_j
-    d_ij = xp.linalg.norm(r_ij, axis=-1)
+    
+    if config.ENABLE_3D:
+        # 3D Version
+        dxy_sq = xp.sum((pos_i[..., 0:2] - pos_j[..., 0:2])**2, axis=-1)
+        dz_sq = ((pos_i[..., 2] - pos_j[..., 2]) / p.sigma_z)**2
+        d_ij = xp.sqrt(dxy_sq + dz_sq)
+    else:
+        # 2D Version
+        d_ij = xp.linalg.norm(r_ij, axis=-1)
     
     # Mask self
     eye_mask = xp.eye(d_ij.shape[-1], dtype=bool)
@@ -110,7 +132,23 @@ def compute_derivatives(pos, phi, v, p, xp=np):
     phi_dot = phi_dot_social + phi_dot_vital
     acc = y_f * (1.0 - v)
 
-    return acc, phi_dot
+    vz_dot = 0.0
+    if config.ENABLE_3D and vz is not None:
+        
+        dz_ij = pos_j[..., 2] - pos_i[..., 2]
+        
+        term_tanh = xp.tanh((dz_ij - xp.sign(dz_ij) * p.d0_z) / p.a_z)
+        term_exp = xp.exp(-(d_ij / p.l_z)**2)
+        f_vz = p.y_z * term_tanh * term_exp
+        
+        if NEIGHBORS == 0:
+            vz_dot = xp.zeros_like(vz)
+        else:
+            vz_dot = xp.sum(f_vz * (~eye_mask), axis=-1)
+    
+    if config.ENABLE_3D:
+        return acc, phi_dot, vz_dot
+    return acc, phi_dot, None
 
 def compute_metrics(pos, phi, phi_dot, v, xp=np):
     """

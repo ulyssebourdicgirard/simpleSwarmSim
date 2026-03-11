@@ -12,7 +12,7 @@ import numpy as np
 import config
 
 from config import NB_DRONES, ARENA_RADIUS, DT, SIM_STEPS, VISU_STEPS, POP_SIZE_GPU, GEN_GPU
-from dynamics import SwarmParams, compute_derivatives, get_deterministic_initial_state, compute_metrics
+from dynamics import SwarmParams, TensorExplorationGrid, compute_derivatives, get_deterministic_initial_state, compute_metrics
 from logger import ExperimentLogger
 from visualization import generate_gif_from_log
 
@@ -31,6 +31,11 @@ def run_batch_gpu(genes):
     
     n_batch = genes['y_att'].shape[0]
     cost_total = cp.zeros(n_batch)
+    
+    grid = None # Grid init
+    if config.SCENARIO == "exploration":
+        grid = TensorExplorationGrid(n_batch, config.ARENA_RADIUS, config.GRID_RES, xp=cp)
+    
 
     for t in range(SIM_STEPS):
         acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, xp=cp)
@@ -44,11 +49,17 @@ def run_batch_gpu(genes):
         if vz is not None and vz_dot is not None:
             vz += vz_dot * DT
             pos[..., 2] += vz * DT
+            
+        if grid:
+            grid.update(pos)
         
-        # Accumulate metrics (Post-Transient)
+        # Accumulate metrics
         if t > 50:
             c_disp, c_effort, c_coll, c_pol, c_mill = compute_metrics(pos, phi, phi_dot, v, xp=cp)
             cost_total += c_disp + c_effort + c_coll + c_pol + c_mill
+
+            if grid:
+                cost_total += grid.get_score() * config.W_EXPLO
 
     return cost_total
 
@@ -126,6 +137,10 @@ def generate_final_data_gpu(params, logger):
     history_v = []
     history_vz = []
     
+    grid = None # Grid init
+    if config.SCENARIO == "exploration":
+        grid = TensorExplorationGrid(1, config.ARENA_RADIUS, config.GRID_RES, xp=cp)
+    
     for _ in range(VISU_STEPS): 
         history_pos.append(pos.get())
         history_phi.append(phi.get())
@@ -143,6 +158,13 @@ def generate_final_data_gpu(params, logger):
         if vz is not None and vz_dot is not None:
             vz += vz_dot * DT
             pos[..., 2] += vz * DT
+            
+        if grid:
+            grid.update(pos)
+            
+    if grid:
+        score = grid.get_score().item()
+        print(f"[GPU] Final Exploration Coverage: {score * 100:.2f}%")
         
     # Arrays are (Time, N, 2) or (Time, N) directly
     full_pos = np.array(history_pos)

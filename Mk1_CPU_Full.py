@@ -11,7 +11,7 @@ from logger import ExperimentLogger
 from visualization import generate_gif_from_log
 
 from config import NB_DRONES, ARENA_RADIUS, DT, SIM_STEPS, VISU_STEPS, POP_SIZE_CPU, GEN_CPU
-from dynamics import SwarmParams, compute_derivatives, get_deterministic_initial_state, compute_metrics
+from dynamics import SwarmParams, TensorExplorationGrid, compute_derivatives, get_deterministic_initial_state, compute_metrics
 
 def run_simulation(params, steps=SIM_STEPS):
     # Deterministic Seed (Frozen Noise)
@@ -20,6 +20,10 @@ def run_simulation(params, steps=SIM_STEPS):
     pos, phi, v, vz = get_deterministic_initial_state(1, NB_DRONES, xp=np)
     
     cost_total = 0.0
+    
+    grid = None # Grid init
+    if config.SCENARIO == "exploration":
+        grid = TensorExplorationGrid(1, config.ARENA_RADIUS, config.GRID_RES, xp=np)
 
     for t in range(steps):
         acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, xp=np)
@@ -32,11 +36,17 @@ def run_simulation(params, steps=SIM_STEPS):
         if vz is not None and vz_dot is not None:
             vz += vz_dot * DT
             pos[:, 2] += vz * DT
+            
+        if grid:
+            grid.update(pos)
         
         # Accumulate metrics (Post-Transient)
         if t > 50:
             c_disp, c_effort, c_coll, c_pol, c_mill = compute_metrics(pos, phi, phi_dot, v, xp=np)
             cost_total += c_disp + c_effort + c_coll + c_pol + c_mill
+            
+            if grid:
+                cost_total += grid.get_score().item() * config.W_EXPLO
             
     return cost_total
 
@@ -97,9 +107,6 @@ def optimize():
     return pop[0], logger # Returning logger for path
 
 def generate_final_data(params, logger):
-    """
-    Runs the final simulation to feed into logs and visualization
-    """
     print("\nGénération de la trajectoire finale (Machine Data)...")
     # Seed reset
     np.random.seed(42)
@@ -110,6 +117,10 @@ def generate_final_data(params, logger):
     history_phi = []
     history_v = []
     history_vz = []
+    
+    grid = None # Grid init
+    if config.SCENARIO == "exploration":
+        grid = TensorExplorationGrid(1, config.ARENA_RADIUS, config.GRID_RES, xp=np)
     
     for _ in range(VISU_STEPS):
         # Current state
@@ -129,6 +140,13 @@ def generate_final_data(params, logger):
         if vz is not None and vz_dot is not None:
             vz += vz_dot * DT
             pos[:, 2] += vz * DT
+            
+        if grid:
+            grid.update(pos)
+            
+    if grid:
+        score = grid.get_score().item()
+        print(f"[CPU] Final Exploration Coverage: {score * 100:.2f}%")
         
     # Conversion to numpy arrays
     full_pos = np.array(history_pos)

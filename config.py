@@ -11,6 +11,8 @@ MAX_SPEED = 2.0
 NEIGHBORS = None   # Number of closest neighbors taken into account for interactions  
 # NEIGHBORS = None for no limit (bypasses partition for better performance)
 COLLISION_DIST = 0.4
+SCENARIO = "exploration"  # "default" | "exploration"
+GRID_RES = 5.0        # Spatial Resolution (m)
 
 # Optimization
 POP_SIZE_CPU = 150        
@@ -28,6 +30,7 @@ W_DISP =0.0
 W_POL = -0.0
 W_COLL = 500.0
 W_MILL = -20.0
+W_EXPLO = -50.0
 
 # Hardware
 try:

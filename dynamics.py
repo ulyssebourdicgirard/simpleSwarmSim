@@ -228,3 +228,31 @@ def compute_metrics(pos, phi, phi_dot, v, xp=np):
     c_mill = mill * W_MILL
     
     return c_disp, c_effort, c_coll, c_pol, c_mill
+
+
+
+class TensorExplorationGrid:
+    def __init__(self, batch_size, arena_radius=50.0, res=5.0, xp=np):
+        self.xp = xp
+        self.res = res
+        self.radius = arena_radius
+        self.size = int((arena_radius * 2) / res)
+        
+        # Pre-allocating VRAM / RAM
+        self.coverage = xp.zeros((batch_size, self.size, self.size), dtype=bool)
+        self.b_idx = xp.arange(batch_size)[:, None]
+
+    def update(self, pos):
+        # Format (Batch, N, Dim)
+        p = pos if pos.ndim == 3 else pos[None, ...]
+        
+        # Hashing spatial
+        idx_x = self.xp.clip(((p[..., 0] + self.radius) / self.res).astype(int), 0, self.size - 1)
+        idx_y = self.xp.clip(((p[..., 1] + self.radius) / self.res).astype(int), 0, self.size - 1)
+        
+        # Assignation idempotente vectorisée
+        self.coverage[self.b_idx, idx_x, idx_y] = True
+
+    def get_score(self):
+        # Ratio de couverture
+        return self.xp.mean(self.coverage, axis=(1, 2))

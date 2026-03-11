@@ -54,12 +54,12 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     y_att, y_ali, y_f = p.y_att, p.y_ali, p.y_f
     d0_att, l_att, l_ali = p.d0_att, p.l_att, p.l_ali
 
-    # Broadcast (Batch, N, 1) => All in one calculus
+    # Broadcast (Batch, N, 1)
     if hasattr(y_att, 'ndim') and y_att.ndim == 2:
         y_att, y_ali = y_att[..., None], y_ali[..., None]
         d0_att, l_att, l_ali = d0_att[..., None], l_att[..., None], l_ali[..., None]
 
-    # --- Wall Interaction (Cylindrical Arena) ---
+    # Wall interaction (Cylindrical Arena)
     dist_xy = xp.linalg.norm(pos[..., 0:2], axis=-1) if config.ENABLE_3D else xp.linalg.norm(pos, axis=-1)
     
     # Heading error rel. to center
@@ -69,19 +69,18 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     # Exponential repulsion
     w_force = 100.0 * xp.exp(2.0 * (dist_xy - ARENA_RADIUS)) * xp.sin(psi_center)
 
-    # --- Social Interaction ---
+    # Social interaction
     pos_i = xp.expand_dims(pos, -2) 
     pos_j = xp.expand_dims(pos, -3)
-    
     r_ij = pos_i - pos_j
     
     if config.ENABLE_3D:
-        # 3D Version
+        # 3D version
         dxy_sq = xp.sum((pos_i[..., 0:2] - pos_j[..., 0:2])**2, axis=-1)
         dz_sq = ((pos_i[..., 2] - pos_j[..., 2]) / p.sigma_z)**2
         d_ij = xp.sqrt(dxy_sq + dz_sq)
     else:
-        # 2D Version
+        # 2D version
         d_ij = xp.linalg.norm(r_ij, axis=-1)
     
     # Mask self
@@ -102,29 +101,52 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     w_ali = 1.0 / (1.0 + (d_ij / l_ali)**2)
     f_ali = y_ali * ((d_ij / d0_att) + 1.0) * w_ali * xp.sin(d_phi)
 
-    # Collision avoidance
-    f_rep = 0 # Disabled because of bad effects
+    # Collision avoidance (Z-axis)
+    f_vz = 0.0
+    if config.ENABLE_3D and vz is not None:
+        dz_ij = pos_j[..., 2] - pos_i[..., 2]
+        term_tanh = xp.tanh((dz_ij - xp.sign(dz_ij) * p.d0_z) / p.a_z)
+        term_exp = xp.exp(-(d_ij / p.l_z)**2)
+        f_vz = p.y_z * term_tanh * term_exp
 
-    # NEIGHBORS logic
+    f_rep = 0.0
+
+    # Init scope
+    vz_dot_social = 0.0
+
+    # Filtering
     if NEIGHBORS == 0:  
         social_sum = xp.zeros_like(phi)
         rep_sum = xp.zeros_like(phi)
+        if config.ENABLE_3D and vz is not None:
+            vz_dot_social = xp.zeros_like(phi)
         
     elif NEIGHBORS is None or NEIGHBORS >= (d_ij.shape[-1] - 1):    
         social_sum = xp.sum((f_att + f_ali) * (~eye_mask), axis=-1)
         rep_sum = xp.sum(f_rep * (~eye_mask), axis=-1)
-        
+        if config.ENABLE_3D and vz is not None:
+            vz_dot_social = xp.sum(f_vz * (~eye_mask), axis=-1)
+            
     else:   
-        d_topo = d_ij.copy()
-        d_topo[eye_mask] = xp.inf 
+        # Partition max influence
+        if config.ENABLE_3D and vz is not None:
+            influence_ij = xp.sqrt((f_att + f_ali)**2 + f_vz**2)
+        else:
+            influence_ij = xp.abs(f_att + f_ali)
+            
+        influence_ij[eye_mask] = -xp.inf 
+        
         k_idx = NEIGHBORS - 1
-        threshold = xp.partition(d_topo, k_idx, axis=-1)[..., k_idx:k_idx+1] 
-        top_k_mask = d_topo <= threshold
+        # Reverse sign for descending order
+        threshold = xp.partition(-influence_ij, k_idx, axis=-1)[..., k_idx:k_idx+1] 
+        top_k_mask = -influence_ij <= threshold
         
         social_sum = xp.sum((f_att + f_ali) * top_k_mask, axis=-1)
         rep_sum = xp.sum(f_rep * top_k_mask, axis=-1)
-    
-    # Noise & Dynamics
+        if config.ENABLE_3D and vz is not None:
+            vz_dot_social = xp.sum(f_vz * top_k_mask, axis=-1)
+
+    # Noise addition
     noise = xp.random.uniform(-0.1, 0.1, size=phi.shape[-1])
     
     phi_dot_social = xp.clip(social_sum + noise, -3.0, 3.0)
@@ -135,19 +157,6 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
 
     vz_dot = 0.0
     if config.ENABLE_3D and vz is not None:
-        
-        # Social vertical alignment
-        dz_ij = pos_j[..., 2] - pos_i[..., 2]
-        term_tanh = xp.tanh((dz_ij - xp.sign(dz_ij) * p.d0_z) / p.a_z)
-        term_exp = xp.exp(-(d_ij / p.l_z)**2)
-        f_vz = p.y_z * term_tanh * term_exp
-        
-        if NEIGHBORS == 0:
-            vz_dot_social = xp.zeros_like(vz)
-        else:
-            vz_dot_social = xp.sum(f_vz * (~eye_mask), axis=-1)
-            
-        # Floor & Ceiling interactions
         dz_floor = pos[..., 2] - config.Z_MIN
         f_floor = 2.0 * p.y_z_w / (1.0 + xp.exp((dz_floor - p.dz_w) / p.dz_w))
         

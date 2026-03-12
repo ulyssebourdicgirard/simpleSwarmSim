@@ -152,6 +152,8 @@ def generate_gif_from_log(log_path):
     
     pos = data['pos'] 
     phi = data['phi'] 
+    # Load coverage grid if available
+    coverage = data['coverage'] if 'coverage' in data.files else None
     
     params = data['params'].item() 
     
@@ -161,6 +163,12 @@ def generate_gif_from_log(log_path):
     if config.ENABLE_3D:
         ax = fig.add_subplot(111, projection='3d')
         theta_circle = np.linspace(0, 2*np.pi, 100)
+        X, Y = None, None
+        
+        if coverage is not None: 
+            x_grid = np.linspace(-ARENA_RADIUS, ARENA_RADIUS, coverage.shape[0])
+            y_grid = np.linspace(-ARENA_RADIUS, ARENA_RADIUS, coverage.shape[1])
+            X, Y = np.meshgrid(x_grid, y_grid)
         
         def update_3d(frame):
             ax.cla()
@@ -168,7 +176,13 @@ def generate_gif_from_log(log_path):
             ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
             ax.set_zlim(0, 10)
             ax.set_title(title)
+            
+            # Draw arena boundary
             ax.plot(ARENA_RADIUS * np.cos(theta_circle), ARENA_RADIUS * np.sin(theta_circle), 0, color='r', ls='--', alpha=0.5)
+            
+            # Draw final coverage on ground plane
+            if coverage is not None:
+                ax.contourf(X, Y, coverage.T, zdir='z', offset=0, cmap='YlGn', alpha=0.3)
             
             px = pos[frame, :, 0]
             py = pos[frame, :, 1]
@@ -188,6 +202,12 @@ def generate_gif_from_log(log_path):
         ax.set_xlim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
         ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
         ax.add_patch(Circle((0, 0), ARENA_RADIUS, color='r', fill=False, ls='--', alpha=0.5))
+        
+        # Plot coverage background
+        if coverage is not None:
+            # Use tuple for extent to satisfy Pylance/Matplotlib
+            extent = (-ARENA_RADIUS, ARENA_RADIUS, -ARENA_RADIUS, ARENA_RADIUS)
+            ax.imshow(coverage.T, extent=extent, origin='lower', cmap='YlGn', alpha=0.3, zorder=0)
         
         ax.set_title(title)
         ax.set_aspect('equal')

@@ -108,22 +108,17 @@ def optimize():
 
 def generate_final_data(params, logger):
     print("\nGénération de la trajectoire finale (Machine Data)...")
-    # Seed reset
     np.random.seed(42)
     
     pos, phi, v, vz = get_deterministic_initial_state(1, NB_DRONES, xp=np)
     
-    history_pos = []
-    history_phi = []
-    history_v = []
-    history_vz = []
+    history_pos, history_phi, history_v, history_vz = [], [], [], []
     
-    grid = None # Grid init
+    grid = None
     if config.SCENARIO == "exploration":
         grid = TensorExplorationGrid(1, config.ARENA_RADIUS, config.GRID_RES, xp=np)
     
     for _ in range(VISU_STEPS):
-        # Current state
         history_pos.append(pos.copy())
         history_phi.append(phi.copy())
         history_v.append(v.copy())
@@ -144,18 +139,20 @@ def generate_final_data(params, logger):
         if grid:
             grid.update(pos)
             
+    final_cov = None
     if grid:
         score = grid.get_score().item()
         print(f"[CPU] Final Exploration Coverage: {score * 100:.2f}%")
+        # Freshness map
+        final_cov = 1.0 - (grid.spoilage[0] / grid.MAX_SPOIL)
         
-    # Conversion to numpy arrays
     full_pos = np.array(history_pos)
     full_phi = np.array(history_phi)
     full_v   = np.array(history_v)
     full_vz  = np.array(history_vz) if vz is not None else None
     
-    # Logging
-    logger.save_trajectory(full_pos, full_phi, full_v, params, vz=full_vz)
+    # Logging with coverage
+    logger.save_trajectory(full_pos, full_phi, full_v, params, vz=full_vz, coverage=final_cov)
 
 if __name__ == "__main__":
     best_params, logger = optimize()

@@ -5,11 +5,11 @@ ENABLE_3D = True    # True: 3D, False: 2D
 Z_MIN = 1.0     
 Z_MAX = 10.0 
 DT = 0.1                
-ARENA_RADIUS = 50.0
+ARENA_RADIUS = 500.0
 NB_DRONES = 20          
-MAX_SPEED = 2.0   
-NEIGHBORS = None   # Number of closest neighbors taken into account for interactions  
-# NEIGHBORS = None for no limit (bypasses partition for better performance)
+MAX_SPEED = 2.0     
+                    # NEIGHBORS = None for no limit (bypasses partition for better performance)
+NEIGHBORS = None    # Number of closest neighbors taken into account for interactions
 COLLISION_DIST = 0.4
 SCENARIO = "exploration"  # "default" | "exploration"
 GRID_RES = 5.0        # Spatial Resolution (m)
@@ -19,7 +19,7 @@ POP_SIZE_CPU = 150
 GEN_CPU = 20              
 
 POP_SIZE_GPU = 5000      
-GEN_GPU = 2             
+GEN_GPU = 20             
 
 SIM_STEPS = 500          
 VISU_STEPS = 1000      

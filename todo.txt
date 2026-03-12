@@ -1,0 +1,5 @@
+- Portage PyTorch pour compatibilité universelle Apple Silicon - CUDA (ne pas oublier de mettre à jour le README)
+
+- implémenter dynamique verticale avec cible d'altitude
+
+- fix visualisation

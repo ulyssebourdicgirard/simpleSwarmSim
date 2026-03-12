@@ -117,8 +117,13 @@ def optimize_gpu():
                 noise = cp.random.normal(1.0, 0.25, genes[k].shape)
                 genes[k][1:] = cp.where(mask[1:], genes[k][1:] * noise[1:], genes[k][1:])
                 
-                genes[k] = cp.maximum(0.1, genes[k])
-                if k == 'd0_att': genes[k] = cp.maximum(0.5, genes[k])
+                # Fixed boundaries
+                if 'ali' in k:
+                    genes[k] = cp.maximum(0.0, genes[k])
+                elif k == 'd0_att': 
+                    genes[k] = cp.maximum(0.5, genes[k])
+                else:
+                    genes[k] = cp.maximum(0.1, genes[k])
 
     final_params = SwarmParams(**{k: genes[k][sorted_idx[0]].item() for k in genes})
     
@@ -129,24 +134,21 @@ def generate_final_data_gpu(params, logger):
     print("\n[GPU] Generating final trajectory...")
     cp.random.seed(42)
     
-    # Dynamics returns (N, 2) when Batch=1, not (1, N, 2)
+    # Init state (Batch=1)
     pos, phi, v, vz = get_deterministic_initial_state(1, NB_DRONES, xp=cp)
     
-    history_pos = []
-    history_phi = []
-    history_v = []
-    history_vz = []
+    history_pos, history_phi, history_v, history_vz = [], [], [], []
     
-    grid = None # Grid init
+    grid = None
     if config.SCENARIO == "exploration":
         grid = TensorExplorationGrid(1, config.ARENA_RADIUS, config.GRID_RES, xp=cp)
     
     for _ in range(VISU_STEPS): 
-        history_pos.append(pos.get())
-        history_phi.append(phi.get())
-        history_v.append(v.get())
+        history_pos.append(pos.copy())  # Use of .copy() for VRAM management, not .get()
+        history_phi.append(phi.copy())
+        history_v.append(v.copy())
         if vz is not None:
-            history_vz.append(vz.get())
+            history_vz.append(vz.copy())
 
         acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, xp=cp)
         
@@ -162,17 +164,21 @@ def generate_final_data_gpu(params, logger):
         if grid:
             grid.update(pos)
             
+    final_cov = None
     if grid:
         score = grid.get_score().item()
         print(f"[GPU] Final Exploration Coverage: {score * 100:.2f}%")
+        # Freshness map
+        final_cov = (1.0 - (grid.spoilage[0] / grid.MAX_SPOIL)).get()
         
-    # Arrays are (Time, N, 2) or (Time, N) directly
-    full_pos = np.array(history_pos)
-    full_phi = np.array(history_phi)
-    full_v   = np.array(history_v)
-    full_vz  = np.array(history_vz) if vz is not None else None
+    full_pos = cp.stack(history_pos).get()
+    full_phi = cp.stack(history_phi).get()
+    full_v   = cp.stack(history_v).get()
+    full_vz  = cp.stack(history_vz).get() if vz is not None else None
     
-    logger.save_trajectory(full_pos, full_phi, full_v, params, vz=full_vz)
+    # Logging with coverage
+    logger.save_trajectory(full_pos, full_phi, full_v, params, vz=full_vz, coverage=final_cov)
+    
 
 if __name__ == "__main__":
     best_p, logger = optimize_gpu()

@@ -238,21 +238,40 @@ class TensorExplorationGrid:
         self.radius = arena_radius
         self.size = int((arena_radius * 2) / res)
         
-        # Pre-allocating VRAM / RAM
-        self.coverage = xp.zeros((batch_size, self.size, self.size), dtype=bool)
-        self.b_idx = xp.arange(batch_size)[:, None]
+        # Spoilage parameters
+        self.MAX_SPOIL = 100.0
+        self.FRESH_RATE = self.MAX_SPOIL / 4.0
+        self.SENSOR_H = 10.0
+        
+        # Continuous grid [Batch, X, Y]
+        self.spoilage = self.xp.full((batch_size, self.size, self.size), self.MAX_SPOIL, dtype=self.xp.float32)
+        self.b_idx = self.xp.arange(batch_size)[:, None]
 
     def update(self, pos):
         # Format (Batch, N, Dim)
         p = pos if pos.ndim == 3 else pos[None, ...]
         
-        # Hashing spatial
-        idx_x = self.xp.clip(((p[..., 0] + self.radius) / self.res).astype(int), 0, self.size - 1)
-        idx_y = self.xp.clip(((p[..., 1] + self.radius) / self.res).astype(int), 0, self.size - 1)
+        # Exponential spoilage
+        self.spoilage *= self.xp.float32(1.01)
+        self.spoilage += self.xp.float32(0.05)
+        self.xp.clip(self.spoilage, 0.0, self.MAX_SPOIL, out=self.spoilage)
         
-        # Assignation idempotente vectorisée
-        self.coverage[self.b_idx, idx_x, idx_y] = True
+        # Spatial hashing
+        idx_x = self.xp.clip(((p[..., 0] + self.radius) / self.res).astype(self.xp.int32), 0, self.size - 1)
+        idx_y = self.xp.clip(((p[..., 1] + self.radius) / self.res).astype(self.xp.int32), 0, self.size - 1)
+        
+        # Freshening
+        if p.shape[-1] == 3:
+            z = self.xp.maximum(p[..., 2], 0.1)
+        else:
+            z = self.xp.full(p[..., 0].shape, self.SENSOR_H, dtype=self.xp.float32)
+            
+        freshen_val = self.FRESH_RATE * self.xp.exp(-z / (2.0 * self.SENSOR_H))
+        
+        current = self.spoilage[self.b_idx, idx_x, idx_y]
+        self.spoilage[self.b_idx, idx_x, idx_y] = self.xp.maximum(self.xp.float32(0.0), current - freshen_val)
 
     def get_score(self):
-        # Ratio de couverture
-        return self.xp.mean(self.coverage, axis=(1, 2))
+        # Freshness ratio (1.0 = fully fresh)
+        freshness = 1.0 - (self.spoilage / self.MAX_SPOIL)
+        return self.xp.mean(freshness, axis=(1, 2))

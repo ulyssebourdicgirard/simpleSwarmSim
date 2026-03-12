@@ -60,12 +60,8 @@ class ExperimentLogger:
             line = f"| {gen:02d}   | {cost:<12.4f} | {duration:<10.2f} | {params_str:<140} |\n"
             f.write(line)
     
-    def save_trajectory(self, pos, phi, v, params, vz=None):
-        """
-        C (NPZ Format): Saves the complete trajectory for replay.
-        Data must be numpy arrays (not lists, not cupy).
-        """
-        # We also save the final parameters in the npz for machine reference
+    def save_trajectory(self, pos, phi, v, params, vz=None, coverage=None):
+        # NPZ Format: Saves trajectory and optional coverage grid
         param_dict = params.__dict__
         
         save_data = {
@@ -78,10 +74,11 @@ class ExperimentLogger:
         if vz is not None:
             save_data['vz'] = vz
             
-        np.savez_compressed(
-            self.trajectory_path,
-            **save_data
-        )
+        if coverage is not None:
+            save_data['coverage'] = coverage
+            
+        np.savez_compressed(self.trajectory_path, **save_data)
+        
         print(f"\n[Logger] Trajectory saved: {self.trajectory_path}")
         return self.trajectory_path
 

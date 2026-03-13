@@ -2,4 +2,4 @@
 
 - implémenter dynamique verticale avec cible d'altitude
 
-- fix visualisation
+- fix visualisation (HTML essentiellement)

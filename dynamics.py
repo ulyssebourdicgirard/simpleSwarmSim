@@ -25,7 +25,10 @@ class SwarmParams:
 def get_deterministic_initial_state(n_batch, n_drones, xp=np):
     # Circle layout (Deterministic)
     radius = ARENA_RADIUS//2
-    theta = xp.linspace(0, 2*xp.pi, n_drones, endpoint=False)
+    if getattr(xp, "__name__", "") == "mlx.core":
+        theta = xp.linspace(0, 2*xp.pi*(1 - 1/n_drones), n_drones)
+    else:
+        theta = xp.linspace(0, 2*xp.pi, n_drones, endpoint=False)
     
     # Broadcast (Batch, N)
     if n_batch > 1:
@@ -40,7 +43,10 @@ def get_deterministic_initial_state(n_batch, n_drones, xp=np):
     
     if config.ENABLE_3D:
         # Added Z axis
-        z = xp.random.uniform(config.Z_MIN + 1.0, config.Z_MAX - 1.0, size=theta.shape)
+        if getattr(xp, "__name__", "") == "mlx.core":
+            z = xp.random.uniform(config.Z_MIN + 1.0, config.Z_MAX - 1.0, shape=theta.shape)
+        else:
+            z = xp.random.uniform(config.Z_MIN + 1.0, config.Z_MAX - 1.0, size=theta.shape)
         pos = xp.stack([x, y, z], axis=-1)
         vz = xp.zeros_like(theta)
         return pos, phi, v, vz
@@ -85,7 +91,10 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
         d_ij = xp.linalg.norm(r_ij, axis=-1)
     
     # Mask self
-    eye_mask = xp.eye(d_ij.shape[-1], dtype=bool)
+    if getattr(xp, "__name__", "") == "mlx.core":
+        eye_mask = xp.eye(d_ij.shape[-1], dtype=xp.bool_)
+    else:
+        eye_mask = xp.eye(d_ij.shape[-1], dtype=bool)
     if len(d_ij.shape) > 2: 
         eye_mask = xp.broadcast_to(eye_mask, d_ij.shape)
     d_ij = xp.maximum(d_ij, 0.01)
@@ -125,7 +134,10 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
         rep_sum = xp.sum(f_rep * top_k_mask, axis=-1)
     
     # Noise & Dynamics
-    noise = xp.random.uniform(-0.1, 0.1, size=phi.shape[-1])
+    if getattr(xp, "__name__", "") == "mlx.core":
+        noise = xp.random.uniform(-0.1, 0.1, shape=(phi.shape[-1],))
+    else:
+        noise = xp.random.uniform(-0.1, 0.1, size=phi.shape[-1])
     
     phi_dot_social = xp.clip(social_sum + noise, -3.0, 3.0)
     phi_dot_vital = xp.clip(rep_sum + w_force, -10.0, 10.0)
@@ -193,7 +205,10 @@ def compute_metrics(pos, phi, phi_dot, v, xp=np):
     d_ij = xp.linalg.norm(r_ij, axis=-1)
     
     # Mask diagonal (self-distance)
-    eye = xp.eye(pos.shape[axis_agent], dtype=bool)
+    if getattr(xp, "__name__", "") == "mlx.core":
+        eye = xp.eye(pos.shape[axis_agent], dtype=xp.bool_)
+    else:
+        eye = xp.eye(pos.shape[axis_agent], dtype=bool)
     if is_batch:
         eye = xp.broadcast_to(eye, d_ij.shape)
     

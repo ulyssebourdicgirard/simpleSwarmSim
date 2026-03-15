@@ -166,8 +166,15 @@ def compute_derivatives(pos, phi, v, p, vz=None):
         dz_ceil = config.Z_MAX - pos[..., 2]
         f_ceil = -2.0 * p.y_z_w / (1.0 + torch.exp((dz_ceil - p.dz_w) / p.dz_w))
         
-        vz_dot = vz_dot_social + f_floor + f_ceil
-    
+        vz_cmd = vz_dot_social + f_floor + f_ceil
+        
+        # Damp
+        speed_3d = torch.sqrt(v**2 + vz**2)
+        vz_cmd -= p.y_f * vz / torch.clamp(speed_3d, min=0.1)
+        
+        # Simulates controller
+        vz_dot = p.y_f * (vz_cmd - vz)
+        
     if config.ENABLE_3D:
         return acc, phi_dot, vz_dot
     return acc, phi_dot, None

@@ -11,8 +11,13 @@ class SwarmParams:
     d0_att: float
     l_att: float
     l_ali: float
-    alpha_att: float = 1.0 
-    alpha_ali: float = 0.0 
+    a_att: float = 0.0
+    b1_att: float = 0.0
+    b2_att: float = 0.0
+    d0_ali: float = 1.0
+    a_ali: float = 0.0
+    b1_ali: float = 0.0
+    b2_ali: float = 0.0
     # 3D Parameters
     y_z: float = 1.0
     l_z: float = 3.0
@@ -53,11 +58,15 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     # Unpack
     y_att, y_ali, y_f = p.y_att, p.y_ali, p.y_f
     d0_att, l_att, l_ali = p.d0_att, p.l_att, p.l_ali
+    a_att, b1_att, b2_att = p.a_att, p.b1_att, p.b2_att
+    d0_ali, a_ali, b1_ali, b2_ali = p.d0_ali, p.a_ali, p.b1_ali, p.b2_ali
 
     # Broadcast (Batch, N, 1)
     if hasattr(y_att, 'ndim') and y_att.ndim == 2:
         y_att, y_ali = y_att[..., None], y_ali[..., None]
         d0_att, l_att, l_ali = d0_att[..., None], l_att[..., None], l_ali[..., None]
+        a_att, b1_att, b2_att = a_att[..., None], b1_att[..., None], b2_att[..., None]
+        d0_ali, a_ali, b1_ali, b2_ali = d0_ali[..., None], a_ali[..., None], b1_ali[..., None], b2_ali[..., None]
 
     # Wall interaction (Cylindrical Arena)
     dist_xy = xp.linalg.norm(pos[..., 0:2], axis=-1) if config.ENABLE_3D else xp.linalg.norm(pos, axis=-1)
@@ -95,11 +104,15 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     d_phi = (phi[..., None, :] - phi[..., :, None] + xp.pi) % (2 * xp.pi) - xp.pi
 
     # Forces 
-    w_att = 1.0 / (1.0 + (d_ij / l_att)**2)
-    f_att = y_att * ((d_ij / d0_att) - 1.0) * w_att * xp.sin(psi)
+    f_att_base = y_att * ((d_ij / d0_att) - 1.0) / (1.0 + (d_ij / l_att)**2)
+    o_att = xp.sin(psi) * (1.0 + a_att * xp.cos(psi))
+    e_att = 1.0 - b1_att * xp.cos(d_phi) - b2_att * xp.cos(2.0 * d_phi)
+    f_att = f_att_base * o_att * e_att
 
-    w_ali = 1.0 / (1.0 + (d_ij / l_ali)**2)
-    f_ali = y_ali * ((d_ij / d0_att) + 1.0) * w_ali * xp.sin(d_phi)
+    f_ali_base = y_ali * ((d_ij / d0_ali) + 1.0) * xp.exp(-(d_ij / l_ali)**2)
+    o_ali = xp.sin(d_phi) * (1.0 + a_ali * xp.cos(2.0 * d_phi))
+    e_ali = 1.0 + b1_ali * xp.cos(psi) - b2_ali * xp.cos(2.0 * psi)
+    f_ali = f_ali_base * o_ali * e_ali
 
     # Collision avoidance (Z-axis)
     f_vz = 0.0

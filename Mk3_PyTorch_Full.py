@@ -71,8 +71,13 @@ def optimize_pytorch(device):
         'y_ali':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.0, 4.0),
         'l_ali':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 5.0),
         'y_f':    torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 2.0),
-        'alpha_att': torch.full((POP_SIZE_GPU, 1), 1.0, device=device),
-        'alpha_ali': torch.full((POP_SIZE_GPU, 1), 0.0, device=device),
+        'a_att':  torch.zeros((POP_SIZE_GPU, 1), device=device),
+        'b1_att': torch.zeros((POP_SIZE_GPU, 1), device=device),
+        'b2_att': torch.zeros((POP_SIZE_GPU, 1), device=device),
+        'd0_ali': torch.ones((POP_SIZE_GPU, 1), device=device),
+        'a_ali':  torch.zeros((POP_SIZE_GPU, 1), device=device),
+        'b1_ali': torch.zeros((POP_SIZE_GPU, 1), device=device),
+        'b2_ali': torch.zeros((POP_SIZE_GPU, 1), device=device),
     }
 
     n_keep = int(0.2 * POP_SIZE_GPU)
@@ -116,7 +121,8 @@ def optimize_pytorch(device):
             fill_idx = torch.cat((best_idx_arr, parents))
             
             for k in genes:
-                if 'alpha' in k: continue
+                # Genes excluded from training
+                if k in ['a_att', 'b1_att', 'b2_att', 'd0_ali', 'a_ali', 'b1_ali', 'b2_ali']: continue
                 genes[k] = genes[k][fill_idx]
                 
                 # Noise mask

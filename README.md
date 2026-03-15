@@ -26,8 +26,8 @@ The system centralizes the physics logic to ensure strict consistency of results
 ### Physics Model
 Agents follow first-order unicycle dynamics on the horizontal plane, with optional vertical dynamics.
 
-The horizontal angular velocity command is derived from the weighted sum of social forces:
-phi_dot_cmd = sum( F_att(d_ij) * sin(psi_ij) + F_ali(d_ij) * sin(delta_phi_ij) ) + F_wall
+The horizontal angular velocity command is derived from the weighted sum of social forces, modulated by viewing angles and heading differences to simulate sensory blind spots:
+phi_dot_cmd = sum( F_att(d_ij) * O_att(psi) * E_att(dphi) + F_ali(d_ij) * O_ali(dphi) * E_ali(psi) ) + F_wall
 
 When `ENABLE_3D` is active, the vertical velocity command is governed by a hyperbolic tangent function for altitude alignment and an exponential decay for social distance.
 

@@ -68,7 +68,14 @@ def optimize():
             l_att=np.random.uniform(1.0, 5.0),
             y_ali=np.random.uniform(0.5, 3.0),
             l_ali=np.random.uniform(1.0, 5.0),
-            y_f=np.random.uniform(0.5, 2.0)
+            y_f=np.random.uniform(0.5, 2.0),
+            a_att=0.0,
+            b1_att=0.0,
+            b2_att=0.0,
+            d0_ali=1.0,
+            a_ali=0.0,
+            b1_ali=0.0,
+            b2_ali=0.0
         ))
 
     # Parallel Pool

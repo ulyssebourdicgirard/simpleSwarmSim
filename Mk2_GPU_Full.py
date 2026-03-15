@@ -76,8 +76,13 @@ def optimize_gpu():
         'y_ali':  cp.random.uniform(0.0, 4.0, (POP_SIZE_GPU, 1)),
         'l_ali':  cp.random.uniform(1.0, 5.0, (POP_SIZE_GPU, 1)),
         'y_f':    cp.random.uniform(0.5, 2.0, (POP_SIZE_GPU, 1)),
-        'alpha_att': cp.full((POP_SIZE_GPU, 1), 1.0),
-        'alpha_ali': cp.full((POP_SIZE_GPU, 1), 0.0),
+        'a_att':  cp.zeros((POP_SIZE_GPU, 1)),
+        'b1_att': cp.zeros((POP_SIZE_GPU, 1)),
+        'b2_att': cp.zeros((POP_SIZE_GPU, 1)),
+        'd0_ali': cp.ones((POP_SIZE_GPU, 1)),
+        'a_ali':  cp.zeros((POP_SIZE_GPU, 1)),
+        'b1_ali': cp.zeros((POP_SIZE_GPU, 1)),
+        'b2_ali': cp.zeros((POP_SIZE_GPU, 1)),
     }
 
     n_keep = int(0.2 * POP_SIZE_GPU)
@@ -110,7 +115,7 @@ def optimize_gpu():
             fill_idx = cp.concatenate((best_idx_arr, parents))
             
             for k in genes:
-                if 'alpha' in k: continue
+                if k in ['a_att', 'b1_att', 'b2_att', 'd0_ali', 'a_ali', 'b1_ali', 'b2_ali']: continue
                 genes[k] = genes[k][fill_idx]
                 
                 mask = cp.random.rand(*genes[k].shape) < 0.25 

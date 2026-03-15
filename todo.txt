@@ -1,5 +1,7 @@
-- Portage PyTorch pour compatibilité universelle Apple Silicon - CUDA (ne pas oublier de mettre à jour le README)
+- ajouter manière de "sortir" les paramètres optimaux vers le modèle temps réel originel de Gautier
 
 - implémenter dynamique verticale avec cible d'altitude
 
-- fix visualisation (HTML essentiellement)
+- fix visualisation (HTML essentiellement, plotly)
+
+- améliorer déterminisme, actuellement l'élitisme de la sélection génétique semble être mis en échec malgré le frozen noise

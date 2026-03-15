@@ -12,8 +12,14 @@ class SwarmParams:
     d0_att: float
     l_att: float
     l_ali: float
-    alpha_att: float = 1.0 
-    alpha_ali: float = 0.0 
+    # Directional parameters
+    a_att: float = 0.0
+    b1_att: float = 0.0
+    b2_att: float = 0.0
+    d0_ali: float = 1.0
+    a_ali: float = 0.0
+    b1_ali: float = 0.0
+    b2_ali: float = 0.0
     # 3D Parameters
     y_z: float = 1.0
     l_z: float = 3.0
@@ -59,11 +65,15 @@ def compute_derivatives(pos, phi, v, p, vz=None):
     # Unpack
     y_att, y_ali, y_f = p.y_att, p.y_ali, p.y_f
     d0_att, l_att, l_ali = p.d0_att, p.l_att, p.l_ali
+    a_att, b1_att, b2_att = p.a_att, p.b1_att, p.b2_att
+    d0_ali, a_ali, b1_ali, b2_ali = p.d0_ali, p.a_ali, p.b1_ali, p.b2_ali
 
     # Broadcast (Batch, N, 1)
     if hasattr(y_att, 'ndim') and y_att.dim() == 2:
         y_att, y_ali = y_att.unsqueeze(-1), y_ali.unsqueeze(-1)
         d0_att, l_att, l_ali = d0_att.unsqueeze(-1), l_att.unsqueeze(-1), l_ali.unsqueeze(-1)
+        a_att, b1_att, b2_att = a_att.unsqueeze(-1), b1_att.unsqueeze(-1), b2_att.unsqueeze(-1)
+        d0_ali, a_ali, b1_ali, b2_ali = d0_ali.unsqueeze(-1), a_ali.unsqueeze(-1), b1_ali.unsqueeze(-1), b2_ali.unsqueeze(-1)
 
     # Wall interaction (Cylindrical Arena)
     dist_xy = torch.linalg.norm(pos[..., 0:2], dim=-1) if config.ENABLE_3D else torch.linalg.norm(pos, dim=-1)
@@ -78,7 +88,7 @@ def compute_derivatives(pos, phi, v, p, vz=None):
     # Social interaction
     pos_i = pos.unsqueeze(-2) 
     pos_j = pos.unsqueeze(-3)
-    r_ij = pos_i - pos_j # Relative distances between all drones
+    r_ij = pos_i - pos_j 
     
     if config.ENABLE_3D:
         # 3D version
@@ -101,11 +111,17 @@ def compute_derivatives(pos, phi, v, p, vz=None):
     d_phi = (phi[..., None, :] - phi[..., :, None] + math.pi) % (2 * math.pi) - math.pi
 
     # Forces 
-    w_att = 1.0 / (1.0 + (d_ij / l_att)**2)
-    f_att = y_att * ((d_ij / d0_att) - 1.0) * w_att * torch.sin(psi)
+    # Attraction
+    f_att_base = y_att * ((d_ij / d0_att) - 1.0) / (1.0 + (d_ij / l_att)**2)
+    o_att = torch.sin(psi) * (1.0 + a_att * torch.cos(psi))
+    e_att = 1.0 - b1_att * torch.cos(d_phi) - b2_att * torch.cos(2.0 * d_phi)
+    f_att = f_att_base * o_att * e_att
 
-    w_ali = 1.0 / (1.0 + (d_ij / l_ali)**2)
-    f_ali = y_ali * ((d_ij / d0_att) + 1.0) * w_ali * torch.sin(d_phi)
+    # Alignement
+    f_ali_base = y_ali * ((d_ij / d0_ali) + 1.0) * torch.exp(-(d_ij / l_ali)**2)
+    o_ali = torch.sin(d_phi) * (1.0 + a_ali * torch.cos(2.0 * d_phi))
+    e_ali = 1.0 + b1_ali * torch.cos(psi) - b2_ali * torch.cos(2.0 * psi)
+    f_ali = f_ali_base * o_ali * e_ali
 
     # Collision avoidance (Z-axis)
     f_vz = 0.0

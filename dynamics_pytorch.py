@@ -86,7 +86,6 @@ def compute_derivatives(pos, phi, v, p, vz=None):
         d0_ali, a_ali, b1_ali, b2_ali = d0_ali.unsqueeze(-1), a_ali.unsqueeze(-1), b1_ali.unsqueeze(-1), b2_ali.unsqueeze(-1)
         y_acc, l_acc, d0_v = y_acc.unsqueeze(-1), l_acc.unsqueeze(-1), d0_v.unsqueeze(-1)
         
-        target_alt = target_alt.unsqueeze(-1)
         
         
     # Wall interaction (Cylindrical Arena)

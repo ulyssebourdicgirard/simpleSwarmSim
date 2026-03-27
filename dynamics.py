@@ -78,8 +78,6 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
         d0_ali, a_ali, b1_ali, b2_ali = d0_ali[..., None], a_ali[..., None], b1_ali[..., None], b2_ali[..., None]
         y_acc, l_acc, d0_v = y_acc[..., None], l_acc[..., None], d0_v[..., None]
         
-        if hasattr(target_alt, 'ndim'):
-            target_alt = target_alt[..., None]
             
     # Wall interaction (Cylindrical Arena)
     dist_xy = xp.linalg.norm(pos[..., 0:2], axis=-1) if config.ENABLE_3D else xp.linalg.norm(pos, axis=-1)

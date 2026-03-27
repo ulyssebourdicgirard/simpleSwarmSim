@@ -26,6 +26,10 @@ class SwarmParams:
     sigma_z: float = 1.0 
     y_z_w: float = 2.0
     dz_w: float = 1.0
+    # Nav
+    y_z_nav: float = 1.0
+    y_vz_nav: float = 1.0
+    target_altitude: float = 5.0
 
 def get_deterministic_initial_state(n_batch, n_drones, xp=np):
     # Circle layout (Deterministic)

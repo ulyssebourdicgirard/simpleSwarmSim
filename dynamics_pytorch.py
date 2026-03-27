@@ -28,6 +28,10 @@ class SwarmParams:
     sigma_z: float = 1.0 
     y_z_w: float = 2.0
     dz_w: float = 1.0
+    # Nav
+    y_z_nav: float = 1.0
+    y_vz_nav: float = 1.0
+    target_altitude: float = 5.0
 
 @torch.no_grad()    # No graph to track gradients, better perf
 def get_deterministic_initial_state(n_batch, n_drones, device=torch.device("cpu")):
@@ -67,6 +71,7 @@ def compute_derivatives(pos, phi, v, p, vz=None):
     d0_att, l_att, l_ali = p.d0_att, p.l_att, p.l_ali
     a_att, b1_att, b2_att = p.a_att, p.b1_att, p.b2_att
     d0_ali, a_ali, b1_ali, b2_ali = p.d0_ali, p.a_ali, p.b1_ali, p.b2_ali
+    target_alt = p.target_altitude
 
     # Broadcast (Batch, N, 1)
     if hasattr(y_att, 'ndim') and y_att.dim() == 2:
@@ -74,7 +79,9 @@ def compute_derivatives(pos, phi, v, p, vz=None):
         d0_att, l_att, l_ali = d0_att.unsqueeze(-1), l_att.unsqueeze(-1), l_ali.unsqueeze(-1)
         a_att, b1_att, b2_att = a_att.unsqueeze(-1), b1_att.unsqueeze(-1), b2_att.unsqueeze(-1)
         d0_ali, a_ali, b1_ali, b2_ali = d0_ali.unsqueeze(-1), a_ali.unsqueeze(-1), b1_ali.unsqueeze(-1), b2_ali.unsqueeze(-1)
-
+        target_alt = target_alt.unsqueeze(-1) # Align dim
+        
+        
     # Wall interaction (Cylindrical Arena)
     dist_xy = torch.linalg.norm(pos[..., 0:2], dim=-1) if config.ENABLE_3D else torch.linalg.norm(pos, dim=-1)
     
@@ -182,7 +189,10 @@ def compute_derivatives(pos, phi, v, p, vz=None):
         dz_ceil = config.Z_MAX - pos[..., 2]
         f_ceil = -2.0 * p.y_z_w / (1.0 + torch.exp((dz_ceil - p.dz_w) / p.dz_w))
         
-        vz_cmd = vz_dot_social + f_floor + f_ceil
+        # Target altitude tracking
+        f_nav = -p.y_z_nav * torch.tanh((pos[..., 2] - target_alt) / p.a_z)
+        
+        vz_cmd = vz_dot_social + f_floor + f_ceil + f_nav
         
         # Damp
         speed_3d = torch.sqrt(v**2 + vz**2)

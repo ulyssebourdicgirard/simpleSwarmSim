@@ -75,7 +75,8 @@ def optimize():
             d0_ali=1.0,
             a_ali=0.0,
             b1_ali=0.0,
-            b2_ali=0.0
+            b2_ali=0.0,
+            target_altitude=np.random.uniform(config.Z_MIN + 1.0, config.Z_MAX - 1.0)
         ))
 
     # Parallel Pool

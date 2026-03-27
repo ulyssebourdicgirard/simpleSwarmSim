@@ -30,6 +30,10 @@ class SwarmParams:
     y_z_nav: float = 1.0
     y_vz_nav: float = 1.0
     target_altitude: float = 5.0
+    # Speed (Social)
+    y_acc: float = 1.0
+    l_acc: float = 2.0
+    d0_v: float = 1.0
 
 def get_deterministic_initial_state(n_batch, n_drones, xp=np):
     # Circle layout (Deterministic)
@@ -64,14 +68,19 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     d0_att, l_att, l_ali = p.d0_att, p.l_att, p.l_ali
     a_att, b1_att, b2_att = p.a_att, p.b1_att, p.b2_att
     d0_ali, a_ali, b1_ali, b2_ali = p.d0_ali, p.a_ali, p.b1_ali, p.b2_ali
+    y_acc, l_acc, d0_v = p.y_acc, p.l_acc, p.d0_v
+    target_alt = p.target_altitude
 
-    # Broadcast (Batch, N, 1)
     if hasattr(y_att, 'ndim') and y_att.ndim == 2:
         y_att, y_ali = y_att[..., None], y_ali[..., None]
         d0_att, l_att, l_ali = d0_att[..., None], l_att[..., None], l_ali[..., None]
         a_att, b1_att, b2_att = a_att[..., None], b1_att[..., None], b2_att[..., None]
         d0_ali, a_ali, b1_ali, b2_ali = d0_ali[..., None], a_ali[..., None], b1_ali[..., None], b2_ali[..., None]
-
+        y_acc, l_acc, d0_v = y_acc[..., None], l_acc[..., None], d0_v[..., None]
+        
+        if hasattr(target_alt, 'ndim'):
+            target_alt = target_alt[..., None]
+            
     # Wall interaction (Cylindrical Arena)
     dist_xy = xp.linalg.norm(pos[..., 0:2], axis=-1) if config.ENABLE_3D else xp.linalg.norm(pos, axis=-1)
     
@@ -118,6 +127,9 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     e_ali = 1.0 + b1_ali * xp.cos(psi) - b2_ali * xp.cos(2.0 * psi)
     f_ali = f_ali_base * o_ali * e_ali
 
+    # Social speed
+    dv_ij = y_acc * xp.cos(psi) * ((d_ij / d0_v) - 1.0) / (1.0 + d_ij / l_acc)
+
     # Collision avoidance (Z-axis)
     f_vz = 0.0
     if config.ENABLE_3D and vz is not None:
@@ -135,21 +147,24 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     if NEIGHBORS == 0:  
         social_sum = xp.zeros_like(phi)
         rep_sum = xp.zeros_like(phi)
+        acc_social = xp.zeros_like(v)
         if config.ENABLE_3D and vz is not None:
             vz_dot_social = xp.zeros_like(phi)
         
     elif NEIGHBORS is None or NEIGHBORS >= (d_ij.shape[-1] - 1):    
         social_sum = xp.sum((f_att + f_ali) * (~eye_mask), axis=-1)
         rep_sum = xp.sum(f_rep * (~eye_mask), axis=-1)
+        acc_social = xp.sum(dv_ij * (~eye_mask), axis=-1)
         if config.ENABLE_3D and vz is not None:
             vz_dot_social = xp.sum(f_vz * (~eye_mask), axis=-1)
             
     else:   
         # Partition max influence
+        f_course = f_att + f_ali
         if config.ENABLE_3D and vz is not None:
-            influence_ij = xp.sqrt((f_att + f_ali)**2 + f_vz**2)
+            influence_ij = xp.sqrt(dv_ij**2 + (f_course * v[..., None])**2 + f_vz**2)
         else:
-            influence_ij = xp.abs(f_att + f_ali)
+            influence_ij = xp.sqrt(dv_ij**2 + (f_course * v[..., None])**2)
             
         influence_ij[eye_mask] = -xp.inf 
         
@@ -158,8 +173,9 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
         threshold = xp.partition(-influence_ij, k_idx, axis=-1)[..., k_idx:k_idx+1] 
         top_k_mask = -influence_ij <= threshold
         
-        social_sum = xp.sum((f_att + f_ali) * top_k_mask, axis=-1)
+        social_sum = xp.sum(f_course * top_k_mask, axis=-1)
         rep_sum = xp.sum(f_rep * top_k_mask, axis=-1)
+        acc_social = xp.sum(dv_ij * top_k_mask, axis=-1)
         if config.ENABLE_3D and vz is not None:
             vz_dot_social = xp.sum(f_vz * top_k_mask, axis=-1)
 
@@ -170,7 +186,7 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     phi_dot_vital = xp.clip(rep_sum + w_force, -10.0, 10.0)
     
     phi_dot = phi_dot_social + phi_dot_vital
-    acc = y_f * (1.0 - v)
+    acc = acc_social + y_f * (1.0 - v)
 
     vz_dot = 0.0
     if config.ENABLE_3D and vz is not None:
@@ -180,7 +196,9 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
         dz_ceil = config.Z_MAX - pos[..., 2]
         f_ceil = -2.0 * p.y_z_w / (1.0 + xp.exp((dz_ceil - p.dz_w) / p.dz_w))
         
-        vz_cmd = vz_dot_social + f_floor + f_ceil
+        f_nav = -p.y_z_nav * xp.tanh((pos[..., 2] - target_alt) / p.a_z)
+        
+        vz_cmd = vz_dot_social + f_floor + f_ceil + f_nav
         speed_3d = xp.sqrt(v**2 + vz**2)
         vz_cmd -= p.y_f * vz / xp.maximum(speed_3d, 0.1)
         vz_dot = p.y_f * (vz_cmd - vz)

@@ -79,6 +79,9 @@ def optimize_pytorch(device):
         'b1_ali': torch.zeros((POP_SIZE_GPU, 1), device=device),
         'b2_ali': torch.zeros((POP_SIZE_GPU, 1), device=device),
         'target_altitude': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(config.Z_MIN + 1.0, config.Z_MAX - 1.0),
+        'y_acc': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.1, 2.0),
+        'l_acc': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 4.0),
+        'd0_v':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 3.0),
     }
 
     n_keep = int(0.2 * POP_SIZE_GPU)
@@ -134,7 +137,7 @@ def optimize_pytorch(device):
                 # Bounds
                 if k == 'target_altitude':
                     genes[k].clamp_(min=config.Z_MIN, max=config.Z_MAX)
-                elif 'ali' in k:
+                elif 'ali' in k or k == 'y_acc':
                     genes[k].clamp_(min=0.0)
                 elif k == 'd0_att': 
                     genes[k].clamp_(min=0.5)

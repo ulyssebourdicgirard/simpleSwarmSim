@@ -76,7 +76,10 @@ def optimize():
             a_ali=0.0,
             b1_ali=0.0,
             b2_ali=0.0,
-            target_altitude=np.random.uniform(config.Z_MIN + 1.0, config.Z_MAX - 1.0)
+            target_altitude=np.random.uniform(config.Z_MIN + 1.0, config.Z_MAX - 1.0),
+            y_acc=np.random.uniform(0.1, 2.0),
+            l_acc=np.random.uniform(0.5, 4.0),
+            d0_v=np.random.uniform(0.5, 3.0)
         ))
 
     # Parallel Pool
@@ -105,9 +108,19 @@ def optimize():
                 if np.random.rand() < 0.2: child.y_att *= np.random.normal(1.0, 0.2)
                 if np.random.rand() < 0.2: child.d0_att *= np.random.normal(1.0, 0.2)
                 if np.random.rand() < 0.2: child.y_ali *= np.random.normal(1.0, 0.2)
+                if np.random.rand() < 0.2: child.y_acc *= np.random.normal(1.0, 0.2)
+                if np.random.rand() < 0.2: child.l_acc *= np.random.normal(1.0, 0.2)
+                if np.random.rand() < 0.2: child.d0_v *= np.random.normal(1.0, 0.2)
+                if np.random.rand() < 0.2: child.target_altitude *= np.random.normal(1.0, 0.1)
                 
+                # Bounds
                 child.d0_att = max(0.5, child.d0_att)
                 child.y_att = max(0.1, child.y_att)
+                child.y_ali = max(0.0, child.y_ali)
+                child.y_acc = max(0.0, child.y_acc)
+                child.l_acc = max(0.1, child.l_acc)
+                child.d0_v = max(0.1, child.d0_v)
+                child.target_altitude = np.clip(child.target_altitude, config.Z_MIN, config.Z_MAX)
                 new_pop.append(child)
                 
             pop = new_pop

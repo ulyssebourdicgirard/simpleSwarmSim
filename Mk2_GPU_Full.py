@@ -84,6 +84,9 @@ def optimize_gpu():
         'b1_ali': cp.zeros((POP_SIZE_GPU, 1)),
         'b2_ali': cp.zeros((POP_SIZE_GPU, 1)),
         'target_altitude': cp.random.uniform(config.Z_MIN + 1.0, config.Z_MAX - 1.0, (POP_SIZE_GPU, 1)),
+        'y_acc': cp.random.uniform(0.1, 2.0, (POP_SIZE_GPU, 1)),
+        'l_acc': cp.random.uniform(0.5, 4.0, (POP_SIZE_GPU, 1)),
+        'd0_v':  cp.random.uniform(0.5, 3.0, (POP_SIZE_GPU, 1)),
     }
 
     n_keep = int(0.2 * POP_SIZE_GPU)
@@ -126,7 +129,7 @@ def optimize_gpu():
                 # Fixed boundaries
                 if k == 'target_altitude':
                     genes[k] = cp.clip(genes[k], config.Z_MIN, config.Z_MAX)
-                elif 'ali' in k:
+                elif 'ali' in k or k == 'y_acc':
                     genes[k] = cp.maximum(0.0, genes[k])
                 elif k == 'd0_att': 
                     genes[k] = cp.maximum(0.5, genes[k])

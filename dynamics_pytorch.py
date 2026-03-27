@@ -32,6 +32,10 @@ class SwarmParams:
     y_z_nav: float = 1.0
     y_vz_nav: float = 1.0
     target_altitude: float = 5.0
+    # Speed (Social)
+    y_acc: float = 1.0
+    l_acc: float = 2.0
+    d0_v: float = 1.0
 
 @torch.no_grad()    # No graph to track gradients, better perf
 def get_deterministic_initial_state(n_batch, n_drones, device=torch.device("cpu")):
@@ -71,6 +75,7 @@ def compute_derivatives(pos, phi, v, p, vz=None):
     d0_att, l_att, l_ali = p.d0_att, p.l_att, p.l_ali
     a_att, b1_att, b2_att = p.a_att, p.b1_att, p.b2_att
     d0_ali, a_ali, b1_ali, b2_ali = p.d0_ali, p.a_ali, p.b1_ali, p.b2_ali
+    y_acc, l_acc, d0_v = p.y_acc, p.l_acc, p.d0_v
     target_alt = p.target_altitude
 
     # Broadcast (Batch, N, 1)
@@ -79,7 +84,9 @@ def compute_derivatives(pos, phi, v, p, vz=None):
         d0_att, l_att, l_ali = d0_att.unsqueeze(-1), l_att.unsqueeze(-1), l_ali.unsqueeze(-1)
         a_att, b1_att, b2_att = a_att.unsqueeze(-1), b1_att.unsqueeze(-1), b2_att.unsqueeze(-1)
         d0_ali, a_ali, b1_ali, b2_ali = d0_ali.unsqueeze(-1), a_ali.unsqueeze(-1), b1_ali.unsqueeze(-1), b2_ali.unsqueeze(-1)
-        target_alt = target_alt.unsqueeze(-1) # Align dim
+        y_acc, l_acc, d0_v = y_acc.unsqueeze(-1), l_acc.unsqueeze(-1), d0_v.unsqueeze(-1)
+        
+        target_alt = target_alt.unsqueeze(-1)
         
         
     # Wall interaction (Cylindrical Arena)
@@ -130,6 +137,9 @@ def compute_derivatives(pos, phi, v, p, vz=None):
     e_ali = 1.0 + b1_ali * torch.cos(psi) - b2_ali * torch.cos(2.0 * psi)
     f_ali = f_ali_base * o_ali * e_ali
 
+    # Social speed
+    dv_ij = y_acc * torch.cos(psi) * ((d_ij / d0_v) - 1.0) / (1.0 + d_ij / l_acc)
+
     # Collision avoidance (Z-axis)
     f_vz = 0.0
     if config.ENABLE_3D and vz is not None:
@@ -145,21 +155,24 @@ def compute_derivatives(pos, phi, v, p, vz=None):
     if NEIGHBORS == 0:  
         social_sum = torch.zeros_like(phi)
         rep_sum = torch.zeros_like(phi)
+        acc_social = torch.zeros_like(v)
         if config.ENABLE_3D and vz is not None:
             vz_dot_social = torch.zeros_like(phi)
         
     elif NEIGHBORS is None or NEIGHBORS >= (d_ij.shape[-1] - 1):    
         social_sum = torch.sum((f_att + f_ali) * (~eye_mask), dim=-1)
         rep_sum = torch.sum(f_rep * (~eye_mask), dim=-1)
+        acc_social = torch.sum(dv_ij * (~eye_mask), dim=-1)
         if config.ENABLE_3D and vz is not None:
             vz_dot_social = torch.sum(f_vz * (~eye_mask), dim=-1)
             
     else:   
         # Partition max influence
+        f_course = f_att + f_ali
         if config.ENABLE_3D and vz is not None:
-            influence_ij = torch.sqrt((f_att + f_ali)**2 + f_vz**2)
+            influence_ij = torch.sqrt(dv_ij**2 + (f_course * v.unsqueeze(-1))**2 + f_vz**2)
         else:
-            influence_ij = torch.abs(f_att + f_ali)
+            influence_ij = torch.sqrt(dv_ij**2 + (f_course * v.unsqueeze(-1))**2)
             
         influence_ij = influence_ij.masked_fill(eye_mask, -float('inf'))
         
@@ -167,8 +180,9 @@ def compute_derivatives(pos, phi, v, p, vz=None):
         threshold = top_k_vals[..., -1:]
         top_k_mask = influence_ij >= threshold
         
-        social_sum = torch.sum((f_att + f_ali) * top_k_mask, dim=-1)
+        social_sum = torch.sum(f_course * top_k_mask, dim=-1)
         rep_sum = torch.sum(f_rep * top_k_mask, dim=-1)
+        acc_social = torch.sum(dv_ij * top_k_mask, dim=-1)
         if config.ENABLE_3D and vz is not None:
             vz_dot_social = torch.sum(f_vz * top_k_mask, dim=-1)
 
@@ -179,7 +193,7 @@ def compute_derivatives(pos, phi, v, p, vz=None):
     phi_dot_vital = torch.clamp(rep_sum + w_force, -10.0, 10.0)
     
     phi_dot = phi_dot_social + phi_dot_vital
-    acc = y_f * (1.0 - v)
+    acc = acc_social + y_f * (1.0 - v)
 
     vz_dot = 0.0
     if config.ENABLE_3D and vz is not None:

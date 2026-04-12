@@ -67,7 +67,7 @@ def get_deterministic_initial_state(n_batch, n_drones, device=torch.device("cpu"
     
     
 @torch.no_grad()
-def compute_derivatives(pos, phi, v, p, vz=None):
+def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None):
     device = pos.device
     
     # Unpack
@@ -191,7 +191,16 @@ def compute_derivatives(pos, phi, v, p, vz=None):
     phi_dot_social = torch.clamp(social_sum + noise, -3.0, 3.0)
     phi_dot_vital = torch.clamp(rep_sum + w_force, -10.0, 10.0)
     
-    phi_dot = phi_dot_social + phi_dot_vital
+    # Raw command & clamp
+    phi_dot_cmd = phi_dot_social + phi_dot_vital
+    phi_dot_cmd = torch.clamp(phi_dot_cmd, -config.MAX_YAW_RATE, config.MAX_YAW_RATE)
+
+    # LPF 
+    if phi_dot_mem is not None:
+        phi_dot = config.ALPHA_LPF * phi_dot_cmd + (1.0 - config.ALPHA_LPF) * phi_dot_mem
+    else:
+        phi_dot = phi_dot_cmd
+
     acc = acc_social + y_f * (1.0 - v)
 
     vz_dot = 0.0
@@ -292,11 +301,14 @@ class TensorExplorationGrid:
         self.size = int((arena_radius * 2) / res)
         
         # Spoilage parameters
+        self.spoil_mult = config.SPOIL_MULT
+        self.spoil_add = config.SPOIL_ADD
+        
         self.MAX_SPOIL = 100.0
         self.FRESH_RATE = self.MAX_SPOIL / 4.0
         self.SENSOR_H = 10.0
         
-        # Continuous grid [Batch, X, Y]
+        # Grid [Batch, X, Y]
         self.spoilage = torch.full((batch_size, self.size, self.size), self.MAX_SPOIL, dtype=torch.float32, device=self.device)
         self.b_idx = torch.arange(batch_size, device=self.device)[:, None]
 
@@ -306,8 +318,8 @@ class TensorExplorationGrid:
         p = pos if pos.dim() == 3 else pos.unsqueeze(0)
         
         # Exponential spoilage (sort of)
-        self.spoilage *= 1.01
-        self.spoilage += 0.05
+        self.spoilage *= self.spoil_mult
+        self.spoilage += self.spoil_add
         self.spoilage.clamp_(min=0.0, max=self.MAX_SPOIL)
         
         # Spatial hashing

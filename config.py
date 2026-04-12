@@ -4,15 +4,23 @@ import os
 ENABLE_3D = True    # True: 3D, False: 2D
 Z_MIN = 1.0     
 Z_MAX = 10.0 
-DT = 0.1                
-ARENA_RADIUS = 50.0
-NB_DRONES = 30          
-MAX_SPEED = 2.0     
+DT = 0.01                
+ARENA_RADIUS = 100.0
+NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 30))         
+MAX_SPEED = 20.0     
                     # NEIGHBORS = None for no limit (bypasses partition for better performance)
 NEIGHBORS = 3       # Number of closest neighbors taken into account for interactions
 COLLISION_DIST = 0.4
 SCENARIO = "exploration"  # "default" | "exploration"
 GRID_RES = 5.0        # Spatial resolution (m)
+
+# Dynamics Control
+ALPHA_LPF = 0.2          # Low-pass filter gain for yaw rate
+MAX_YAW_RATE = 3.14      # Max rotational speed (rad/s)
+
+# Exploration
+SPOIL_MULT = 1.01
+SPOIL_ADD = 0.05
 
 # Optimization
 POP_SIZE_CPU = 150        

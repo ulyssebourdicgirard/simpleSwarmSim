@@ -172,9 +172,22 @@ def generate_gif_from_log(log_path):
         
         def update_3d(frame):
             ax.cla()
-            ax.set_xlim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
-            ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
-            ax.set_zlim(0, 10)
+            if getattr(config, "FULL_MILLING_MODE", False):
+                barycenter = np.mean(pos[frame], axis=0) # Focus on the barycenter for appropriate viewing
+                max_dist = np.max(np.linalg.norm(pos[frame, :, 0:2] - barycenter[0:2], axis=-1))
+                margin = max(5.0, max_dist * 1.5)
+                
+                ax.set_xlim(barycenter[0] - margin, barycenter[0] + margin)
+                ax.set_ylim(barycenter[1] - margin, barycenter[1] + margin)
+                
+                z_margin = max(5.0, np.max(np.abs(pos[frame, :, 2] - barycenter[2])) * 1.5)
+                ax.set_zlim(max(0, barycenter[2] - z_margin), barycenter[2] + z_margin)
+            else:
+                ax.set_xlim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
+                ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
+                ax.set_zlim(0, 10)
+                # Draw arena boundary
+                ax.plot(ARENA_RADIUS * np.cos(theta_circle), ARENA_RADIUS * np.sin(theta_circle), 0, color='r', ls='--', alpha=0.5)
             ax.set_title(title)
             
             # Draw arena boundary
@@ -199,10 +212,13 @@ def generate_gif_from_log(log_path):
         
     else:
         ax = fig.add_subplot(111)
-        ax.set_xlim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
-        ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
-        ax.add_patch(Circle((0, 0), ARENA_RADIUS, color='r', fill=False, ls='--', alpha=0.5))
-        
+        if getattr(config, "FULL_MILLING_MODE", False):
+            ax.autoscale(False) # Les limites seront gérées dans update()
+        else:
+            ax.set_xlim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
+            ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
+            ax.add_patch(Circle((0, 0), ARENA_RADIUS, color='r', fill=False, ls='--', alpha=0.5))
+            
         # Plot coverage background
         if coverage is not None:
             # Use tuple for extent to satisfy Pylance/Matplotlib
@@ -220,6 +236,14 @@ def generate_gif_from_log(log_path):
         def update(frame):
             quiver.set_offsets(pos[frame])
             quiver.set_UVC(np.cos(phi[frame]), np.sin(phi[frame]))
+            
+            if getattr(config, "FULL_MILLING_MODE", False):
+                barycenter = np.mean(pos[frame], axis=0)
+                max_dist = np.max(np.linalg.norm(pos[frame] - barycenter, axis=-1))
+                margin = max(5.0, max_dist * 1.5)
+                ax.set_xlim(barycenter[0] - margin, barycenter[0] + margin)
+                ax.set_ylim(barycenter[1] - margin, barycenter[1] + margin)
+            
             return quiver,
 
         ani = FuncAnimation(fig, update, frames=len(pos), interval=30, blit=True)

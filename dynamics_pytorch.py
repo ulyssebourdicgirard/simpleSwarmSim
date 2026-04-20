@@ -96,7 +96,10 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None):
     psi_center = (angle_to_center - phi + math.pi) % (2 * math.pi) - math.pi
     
     # Exponential repulsion
-    w_force = 100.0 * torch.exp(2.0 * (dist_xy - ARENA_RADIUS)) * torch.sin(psi_center)
+    if getattr(config, "FULL_MILLING_MODE", False):
+        w_force = 0.0
+    else:
+        w_force = 100.0 * torch.exp(2.0 * (dist_xy - ARENA_RADIUS)) * torch.sin(psi_center)
 
     # Social interaction
     pos_i = pos.unsqueeze(-2) 

@@ -87,7 +87,10 @@ def compute_derivatives(pos, phi, v, p, vz=None, xp=np):
     psi_center = (angle_to_center - phi + xp.pi) % (2 * xp.pi) - xp.pi
     
     # Exponential repulsion
-    w_force = 100.0 * xp.exp(2.0 * (dist_xy - ARENA_RADIUS)) * xp.sin(psi_center)
+    if getattr(config, "FULL_MILLING_MODE", False):
+        w_force = 0.0 # disabled -> no arena
+    else:
+        w_force = 100.0 * xp.exp(2.0 * (dist_xy - ARENA_RADIUS)) * xp.sin(psi_center)
 
     # Social interaction
     pos_i = xp.expand_dims(pos, -2) 

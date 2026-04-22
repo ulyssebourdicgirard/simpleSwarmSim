@@ -9,7 +9,7 @@ ARENA_RADIUS = 100.0
 NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 30))         
 MAX_SPEED = 20.0     
                     # NEIGHBORS = None for no limit (bypasses partition for better performance)
-NEIGHBORS = 3       # Number of closest neighbors taken into account for interactions
+NEIGHBORS = 4       # Number of closest neighbors taken into account for interactions
 COLLISION_DIST = 0.4
 SCENARIO = "exploration"  # "default" | "exploration"
 FULL_MILLING_MODE = True # Enables the no-arena milling scenario
@@ -39,7 +39,7 @@ if FULL_MILLING_MODE:
     W_EFFORT = 1.0       # To avoid shaking
     W_DISP = 0.0         
     W_POL = 0.0          # No reward for flying in a straight line
-    W_COLL = 500.0       
+    W_COLL = 0       
     W_MILL = -100.0      # NEGATIVE VALUE to reward milling
     W_EXPLO = 0.0
 else:

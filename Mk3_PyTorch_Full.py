@@ -84,8 +84,9 @@ def optimize_pytorch(device):
         'd0_v':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 3.0),
     }
 
-    n_keep = int(0.2 * POP_SIZE_GPU)
     sorted_idx = torch.arange(POP_SIZE_GPU, device=device)
+    global_best_cost = float('inf')
+    global_best_params = {}
     
     for gen in range(GEN_GPU):
         t0 = time.time()
@@ -106,33 +107,46 @@ def optimize_pytorch(device):
         best_idx = sorted_idx[0]
         best_cost = costs[best_idx].item()
         
-        print(f"Gen {gen:02d} | Cost: {best_cost:.2f} | T: {dt:.2f}s")
+        if best_cost < global_best_cost:
+            global_best_cost = best_cost
+            global_best_params = {k: genes[k][best_idx].clone() for k in genes}
+            
+        print(f"Gen {gen:02d} | Cost: {global_best_cost:.2f} | T: {dt:.2f}s")
         
         # Log
-        best_gene_values = {k: genes[k][best_idx].item() for k in genes}
-        current_best = SwarmParams(**best_gene_values)
-        logger.log_generation(gen, best_cost, dt, current_best)
+        current_best = SwarmParams(**{k: v.item() for k, v in global_best_params.items()})
+        logger.log_generation(gen, global_best_cost, dt, current_best)
 
         # Mutate
         if gen < GEN_GPU - 1:
             torch.manual_seed(int(time.time() * 1000) % (2**32 - 1))
             
-            survivors = sorted_idx[:n_keep]
-            best_idx_arr = sorted_idx[:1]
-            
             # Selection
-            parents = survivors[torch.randint(0, n_keep, (POP_SIZE_GPU - 1,), device=device)]
-            fill_idx = torch.cat((best_idx_arr, parents))
+            tournament_size = 3
+            tournaments = torch.randint(0, POP_SIZE_GPU, (POP_SIZE_GPU - 1, tournament_size), device=device)
+            winners_idx = tournaments[torch.arange(POP_SIZE_GPU - 1).unsqueeze(1), torch.argmin(costs[tournaments], dim=1, keepdim=True)].squeeze()
+            parent1_idx = winners_idx
+
+            tournaments2 = torch.randint(0, POP_SIZE_GPU, (POP_SIZE_GPU - 1, tournament_size), device=device)
+            winners2_idx = tournaments2[torch.arange(POP_SIZE_GPU - 1).unsqueeze(1), torch.argmin(costs[tournaments2], dim=1, keepdim=True)].squeeze()
+            parent2_idx = winners2_idx
+            
+            mutation_rate = 0.35 - (0.20 * (gen / GEN_GPU))
             
             for k in genes:
                 # Genes excluded from training
                 if k in ['a_att', 'b1_att', 'b2_att', 'd0_ali', 'a_ali', 'b1_ali', 'b2_ali']: continue
-                genes[k] = genes[k][fill_idx]
+                
+                crossover_mask = torch.rand((POP_SIZE_GPU - 1, 1), device=device) < 0.5
+                children_genes = torch.where(crossover_mask, genes[k][parent1_idx], genes[k][parent2_idx])
                 
                 # Noise mask
-                mask = torch.rand(genes[k].shape, device=device) < 0.25 
-                noise = torch.normal(mean=1.0, std=0.25, size=genes[k].shape, device=device)
-                genes[k][1:] = torch.where(mask[1:], genes[k][1:] * noise[1:], genes[k][1:])
+                mask = torch.rand(children_genes.shape, device=device) < mutation_rate
+                noise = torch.normal(mean=1.0, std=0.3, size=children_genes.shape, device=device)
+                children_genes = torch.where(mask, children_genes * noise, children_genes)
+                
+                genes[k][1:] = children_genes
+                genes[k][0] = global_best_params[k]
                 
                 # Bounds
                 if k == 'target_altitude':
@@ -145,7 +159,7 @@ def optimize_pytorch(device):
                     genes[k].clamp_(min=0.1)
 
     # Final extraction
-    final_params = SwarmParams(**{k: genes[k][sorted_idx[0]].item() for k in genes})
+    final_params = SwarmParams(**{k: genes[k][0].item() for k in genes})
     
     logger.close()
     return final_params, logger

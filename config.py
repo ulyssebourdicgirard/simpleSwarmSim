@@ -1,7 +1,7 @@
 import os
 
 # Env / Physics
-ENABLE_3D = False    # True: 3D, False: 2D
+ENABLE_3D = True    # True: 3D, False: 2D
 Z_MIN = 1.0     
 Z_MAX = 10.0 
 DT = 0.1             # for 3D simulations, use 0.01 max   
@@ -12,7 +12,7 @@ MAX_SPEED = 20.0
 NEIGHBORS = 4       # Number of closest neighbors taken into account for interactions
 COLLISION_DIST = 0.4
 SCENARIO = "exploration"  # "default" | "exploration"
-FULL_MILLING_MODE = True # Enables the no-arena milling scenario
+FULL_MILLING_MODE = False # Enables the no-arena milling scenario
 GRID_RES = 5.0        # Spatial resolution (m)
 
 # Dynamics Control
@@ -43,9 +43,9 @@ if FULL_MILLING_MODE:
     W_MILL = -100.0      # NEGATIVE VALUE to reward milling
     W_EXPLO = 0.0
 else:
-    W_EFFORT = 1   
+    W_EFFORT = 1.0  
     W_DISP = 0.0
     W_POL = -0.0
     W_COLL = 500.0
-    W_MILL = 20.0
+    W_MILL = 0
     W_EXPLO = -50.0

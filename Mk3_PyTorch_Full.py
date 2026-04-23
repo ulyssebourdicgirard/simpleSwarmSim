@@ -122,7 +122,7 @@ def optimize_pytorch(device):
             torch.manual_seed(int(time.time() * 1000) % (2**32 - 1))
             
             # Selection
-            tournament_size = 3
+            tournament_size = 3 
             tournaments = torch.randint(0, POP_SIZE_GPU, (POP_SIZE_GPU - 1, tournament_size), device=device)
             winners_idx = tournaments[torch.arange(POP_SIZE_GPU - 1).unsqueeze(1), torch.argmin(costs[tournaments], dim=1, keepdim=True)].squeeze()
             parent1_idx = winners_idx

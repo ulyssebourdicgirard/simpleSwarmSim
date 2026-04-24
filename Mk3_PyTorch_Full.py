@@ -65,12 +65,12 @@ def optimize_pytorch(device):
     
     # Init pop
     genes = {
-        'y_att':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 5.0),
-        'd0_att': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 4.0),
-        'l_att':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 5.0),
+        'y_att':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.001, 5.0),
+        'd0_att': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 4.0), # Augmenter distances pour permettre plus longue attraction
+        'l_att':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 5.0), # l_att >>> d0_att
         'y_ali':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.0, 4.0),
         'l_ali':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 5.0),
-        'y_f':    torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 2.0),
+        'y_f':    torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.001, 2.0), # Pas forcément variable
         'a_att':  torch.zeros((POP_SIZE_GPU, 1), device=device),
         'b1_att': torch.zeros((POP_SIZE_GPU, 1), device=device),
         'b2_att': torch.zeros((POP_SIZE_GPU, 1), device=device),
@@ -79,7 +79,7 @@ def optimize_pytorch(device):
         'b1_ali': torch.zeros((POP_SIZE_GPU, 1), device=device),
         'b2_ali': torch.zeros((POP_SIZE_GPU, 1), device=device),
         'target_altitude': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(config.Z_MIN + 1.0, config.Z_MAX - 1.0),
-        'y_acc': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.1, 2.0),
+        'y_acc': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.001, 2.0),
         'l_acc': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 4.0),
         'd0_v':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 3.0),
     }

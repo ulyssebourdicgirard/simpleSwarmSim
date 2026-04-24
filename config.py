@@ -4,12 +4,12 @@ import os
 ENABLE_3D = True    # True: 3D, False: 2D
 Z_MIN = 1.0     
 Z_MAX = 10.0 
-DT = 0.1             # for 3D simulations, use 0.01 max   
+DT = 0.1             # ADVICE : for 3D simulations, use less than 0.1   
 ARENA_RADIUS = 100.0
 NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 30))         
 MAX_SPEED = 20.0     
                     # NEIGHBORS = None for no limit (bypasses partition for better performance)
-NEIGHBORS = 4       # Number of closest neighbors taken into account for interactions
+NEIGHBORS = 2       # Number of closest neighbors taken into account for interactions
 COLLISION_DIST = 0.4
 SCENARIO = "exploration"  # "default" | "exploration"
 FULL_MILLING_MODE = False # Enables the no-arena milling scenario

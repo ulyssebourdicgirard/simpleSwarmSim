@@ -36,38 +36,57 @@ class SwarmParams:
     y_acc: float = 1.0
     l_acc: float = 2.0
     d0_v: float = 1.0
+    # Exploration
+    y_explo: float = 0.0
 
 @torch.no_grad()    # No graph to track gradients, better perf
 def get_deterministic_initial_state(n_batch, n_drones, device=torch.device("cpu")):
-    # Circle layout (Deterministic)
-    radius = ARENA_RADIUS // 2
-    theta = torch.arange(n_drones, device=device, dtype=torch.float32) * (2.0 * math.pi / n_drones)
+    total_envs = n_batch * getattr(config, 'N_INIT_CONDITIONS', 4)
     
-    # Broadcast (Batch, N)
-    if n_batch > 1:
-        theta = theta.tile((n_batch, 1))
+    radius = ARENA_RADIUS * 0.8
+    theta = torch.empty((total_envs, n_drones), device=device, dtype=torch.float32).uniform_(0, 2.0 * math.pi)
+    
+    u = torch.rand((total_envs, n_drones), device=device, dtype=torch.float32)
+    r = radius * torch.sqrt(u)
         
-    x = radius * torch.cos(theta)
-    y = radius * torch.sin(theta)
+    x = r * torch.cos(theta)
+    y = r * torch.sin(theta)
     
+    if config.ENABLE_3D:
+        z = torch.empty_like(theta).uniform_(config.Z_MIN + 1.0, config.Z_MAX - 1.0)
+        pos = torch.stack([x, y, z], dim=-1)
+    else:
+        pos = torch.stack([x, y], dim=-1)
+        
+    min_dist = getattr(config, 'MIN_SPAWN_DIST', 2.0)
+    for _ in range(20):
+        pos_i = pos.unsqueeze(-2)
+        pos_j = pos.unsqueeze(-3)
+        dist = torch.linalg.norm(pos_i - pos_j, dim=-1)
+        
+        eye_mask = torch.eye(n_drones, dtype=torch.bool, device=device).expand(dist.shape)
+        dist = dist.masked_fill(eye_mask, float('inf'))
+        
+        overlap = torch.clamp(min_dist - dist, min=0.0)
+        direction = (pos_i - pos_j) / (dist.unsqueeze(-1) + 1e-6)
+        push = torch.sum(direction * overlap.unsqueeze(-1), dim=-2) * 0.5
+        pos += push
+
     # State vectors
-    phi = theta + 0.1 # Outward looking + offset
+    phi = torch.empty_like(theta).uniform_(-math.pi, math.pi) # Outward looking + offset
     v = torch.zeros_like(theta)
     
     if config.ENABLE_3D:
         # Added Z axis
-        z = torch.empty_like(theta).uniform_(config.Z_MIN + 1.0, config.Z_MAX - 1.0)
-        pos = torch.stack([x, y, z], dim=-1)
         vz = torch.zeros_like(theta)
         return pos, phi, v, vz
     else:
         # 2D version
-        pos = torch.stack([x, y], dim=-1)
         return pos, phi, v, None
     
     
 @torch.no_grad()
-def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None):
+def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
     device = pos.device
     
     # Unpack
@@ -77,6 +96,18 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None):
     d0_ali, a_ali, b1_ali, b2_ali = p.d0_ali, p.a_ali, p.b1_ali, p.b2_ali
     y_acc, l_acc, d0_v = p.y_acc, p.l_acc, p.d0_v
     target_alt = p.target_altitude
+    y_explo = getattr(p, 'y_explo', 0.0)
+
+    # Broadcast (Batch, N, 1)
+    if hasattr(y_att, 'ndim') and y_att.dim() == 2:
+        y_att, y_ali = y_att.unsqueeze(-1), y_ali.unsqueeze(-1)
+        d0_att, l_att, l_ali = d0_att.unsqueeze(-1), l_att.unsqueeze(-1), l_ali.unsqueeze(-1)
+        a_att, b1_att, b2_att = a_att.unsqueeze(-1), b1_att.unsqueeze(-1), b2_att.unsqueeze(-1)
+        d0_ali, a_ali, b1_ali, b2_ali = d0_ali.unsqueeze(-1), a_ali.unsqueeze(-1), b1_ali.unsqueeze(-1), b2_ali.unsqueeze(-1)
+        y_acc, l_acc, d0_v = y_acc.unsqueeze(-1), l_acc.unsqueeze(-1), d0_v.unsqueeze(-1)
+        
+        if isinstance(y_explo, torch.Tensor) and y_explo.dim() == 2:
+            y_explo = y_explo.unsqueeze(-1)
 
     # Broadcast (Batch, N, 1)
     if hasattr(y_att, 'ndim') and y_att.dim() == 2:
@@ -188,8 +219,34 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None):
         if config.ENABLE_3D and vz is not None:
             vz_dot_social = torch.sum(f_vz * top_k_mask, dim=-1)
 
+    
+    # Exploration force
+    phi_dot_explo = 0.0
+    vz_dot_explo = 0.0
+    
+    if grid is not None and getattr(config, 'SCENARIO', 'default') == 'exploration':
+        grad_x, grad_y = grid.get_gradient(pos)
+        
+        # Angle vers la direction la plus inexplorée
+        target_angle = torch.atan2(grad_y, grad_x)
+        angle_diff = (target_angle - phi + math.pi) % (2 * math.pi) - math.pi
+        
+        # Force activée proportionnellement à l'urgence d'explorer (magnitude du gradient)
+        grad_mag = torch.sqrt(grad_x**2 + grad_y**2)
+        explo_activation = torch.clamp(grad_mag / (grid.MAX_SPOIL * 0.1), 0.0, 1.0)
+        
+        phi_dot_explo = y_explo * angle_diff * explo_activation
+        
+        # Optionnel : si Z est activé, plonger légèrement vers le sol (-Z) pour utiliser la puissance max du FOV
+        if config.ENABLE_3D and vz is not None:
+            vz_dot_explo = - y_explo * explo_activation * 0.5
+
     # Noise addition
     noise = torch.empty_like(phi).uniform_(-0.1, 0.1)
+    
+    
+    phi_dot_social = torch.clamp(social_sum + phi_dot_explo + noise, -3.0, 3.0) # With added exploration force
+    phi_dot_vital = torch.clamp(rep_sum + w_force, -10.0, 10.0)
     
     phi_dot_social = torch.clamp(social_sum + noise, -3.0, 3.0)
     phi_dot_vital = torch.clamp(rep_sum + w_force, -10.0, 10.0)
@@ -217,7 +274,7 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None):
         # Target altitude tracking
         f_nav = -p.y_z_nav * torch.tanh((pos[..., 2] - target_alt) / p.a_z)
         
-        vz_cmd = vz_dot_social + f_floor + f_ceil + f_nav
+        vz_cmd = vz_dot_social + f_floor + f_ceil + f_nav + vz_dot_explo
         
         # Damp
         speed_3d = torch.sqrt(v**2 + vz**2)
@@ -297,23 +354,34 @@ def compute_metrics(pos, phi, phi_dot, v):
 
 
 class TensorExplorationGrid:
-    def __init__(self, batch_size, arena_radius=50.0, res=5.0, device=torch.device("cpu")):
+    def __init__(self, batch_size, n_drones, arena_radius=50.0, res=5.0, device=torch.device("cpu")):
         self.device = device
         self.res = res
         self.radius = arena_radius
         self.size = int((arena_radius * 2) / res)
+        self.strategy = getattr(config, 'MAP_STRATEGY', 'global')
+        self.n_drones = n_drones
         
         # Spoilage parameters
         self.spoil_mult = config.SPOIL_MULT
         self.spoil_add = config.SPOIL_ADD
-        
         self.MAX_SPOIL = 100.0
         self.FRESH_RATE = self.MAX_SPOIL / 4.0
         self.SENSOR_H = 10.0
         
         # Grid [Batch, X, Y]
-        self.spoilage = torch.full((batch_size, self.size, self.size), self.MAX_SPOIL, dtype=torch.float32, device=self.device)
-        self.b_idx = torch.arange(batch_size, device=self.device)[:, None]
+        if self.strategy == "global":
+            self.spoilage = torch.full((batch_size, self.size, self.size), self.MAX_SPOIL, dtype=torch.float32, device=self.device)
+        else:
+            # Each drone in each swarm gets its own map
+            self.spoilage = torch.full((batch_size, n_drones, self.size, self.size), self.MAX_SPOIL, dtype=torch.float32, device=self.device)
+
+        # Coordinate grids for FOV vectorization
+        xs = torch.linspace(-self.radius + res/2, self.radius - res/2, self.size, device=self.device)
+        ys = torch.linspace(-self.radius + res/2, self.radius - res/2, self.size, device=self.device)
+        grid_x, grid_y = torch.meshgrid(xs, ys, indexing='ij')
+        self.grid_x = grid_x.view(1, 1, self.size, self.size)
+        self.grid_y = grid_y.view(1, 1, self.size, self.size)
 
     @torch.no_grad()
     def update(self, pos):
@@ -325,23 +393,102 @@ class TensorExplorationGrid:
         self.spoilage += self.spoil_add
         self.spoilage.clamp_(min=0.0, max=self.MAX_SPOIL)
         
-        # Spatial hashing
-        idx_x = torch.clamp(((p[..., 0] + self.radius) / self.res).to(torch.int32), 0, self.size - 1)
-        idx_y = torch.clamp(((p[..., 1] + self.radius) / self.res).to(torch.int32), 0, self.size - 1)
+        # Distance calculation for FOV instead of simple spatial hashing
+        px = p[..., 0:1, None]
+        py = p[..., 1:2, None]
+        dist_sq = (self.grid_x - px)**2 + (self.grid_y - py)**2
         
-        # Freshening
         if p.shape[-1] == 3:
-            z = torch.clamp(p[..., 2], min=0.1)
+            z = torch.clamp(p[..., 2:3, None], min=0.5)
         else:
-            z = torch.full(p[..., 0].shape, self.SENSOR_H, dtype=torch.float32, device=self.device)
+            z = torch.full_like(px, self.SENSOR_H)
             
-        freshen_val = self.FRESH_RATE * torch.exp(-z / (2.0 * self.SENSOR_H))
+        # FOV geometry and Inverse Square Law intensity
+        fov_factor = getattr(config, 'FOV_FACTOR', 1.0)
+        sigma = torch.clamp(z * fov_factor, min=self.res / 2.0)
+        intensity = (self.FRESH_RATE * self.SENSOR_H) / (z**2)
         
-        current = self.spoilage[self.b_idx, idx_x, idx_y]
-        self.spoilage[self.b_idx, idx_x, idx_y] = torch.clamp(current - freshen_val, min=0.0)
+        # Freshening matrix (Gaussian splat)
+        freshen_matrix = intensity * torch.exp(-dist_sq / (2.0 * sigma**2))
+        
+        if self.strategy == "global":
+            # Sequential writing to avoid conflicts -> Summing contributions for the global map
+            total_freshen = torch.sum(freshen_matrix, dim=1)
+            self.spoilage -= total_freshen
+            self.spoilage.clamp_(min=0.0)
+        else:
+            # each drone updates his own map
+            self.spoilage -= freshen_matrix
+            self.spoilage.clamp_(min=0.0)
+
+    @torch.no_grad()
+    def share_maps(self, pos, neighbors_k):
+        if self.strategy != "local_shared" or neighbors_k is None or neighbors_k == 0:
+            return
+            
+        pos_i = pos.unsqueeze(-2)
+        pos_j = pos.unsqueeze(-3)
+        dist = torch.linalg.norm(pos_i - pos_j, dim=-1)
+        
+        eye_mask = torch.eye(self.n_drones, dtype=torch.bool, device=self.device).expand(dist.shape) # mask own distance
+        dist = dist.masked_fill(eye_mask, float('inf'))
+        
+        _, top_indices = torch.topk(dist, neighbors_k, dim=-1, largest=False) # k closest neighbors
+        
+        new_spoilage = self.spoilage.clone()
+        batch_idx = torch.arange(pos.shape[0], device=self.device).view(-1, 1, 1)
+        
+        for k in range(neighbors_k):
+            neighbor_idx = top_indices[..., k]
+            neighbor_map = self.spoilage[batch_idx, neighbor_idx]       # getting the neighbors's maps
+            new_spoilage = torch.minimum(new_spoilage, neighbor_map)    # keeping the best information (unilateral)
+            
+        self.spoilage = new_spoilage
 
     @torch.no_grad()
     def get_score(self):
-        # Freshness ratio (1.0 = fully fresh)
-        freshness = 1.0 - (self.spoilage / self.MAX_SPOIL)
-        return torch.mean(freshness, dim=(1, 2))
+        if self.strategy == "global":
+            freshness = 1.0 - (self.spoilage / self.MAX_SPOIL) # freshness 1.0 = fully fresh
+            return torch.mean(freshness, dim=(1, 2))
+        else:
+            global_spoilage, _ = torch.min(self.spoilage, dim=1)
+            freshness = 1.0 - (global_spoilage / self.MAX_SPOIL)
+            return torch.mean(freshness, dim=(1, 2))
+        
+        
+    @torch.no_grad()
+    def get_gradient(self, pos):
+        """Returns spatial gradient of freshness"""
+        offset = 3 # Anticipation by 3 blocks
+        
+        idx_x = ((pos[..., 0] + self.radius) / self.res).to(torch.int64)
+        idx_y = ((pos[..., 1] + self.radius) / self.res).to(torch.int64)
+        
+        # To stay on the grid
+        idx_x_p = torch.clamp(idx_x + offset, 0, self.size - 1)
+        idx_x_m = torch.clamp(idx_x - offset, 0, self.size - 1)
+        idx_y_p = torch.clamp(idx_y + offset, 0, self.size - 1)
+        idx_y_m = torch.clamp(idx_y - offset, 0, self.size - 1)
+        idx_x_c = torch.clamp(idx_x, 0, self.size - 1)
+        idx_y_c = torch.clamp(idx_y, 0, self.size - 1)
+        
+        batch_size = pos.shape[0]
+        b_idx = torch.arange(batch_size, device=self.device).unsqueeze(1)
+        
+        if self.strategy == "global":
+            spoil_x_p = self.spoilage[b_idx, idx_x_p, idx_y_c]
+            spoil_x_m = self.spoilage[b_idx, idx_x_m, idx_y_c]
+            spoil_y_p = self.spoilage[b_idx, idx_x_c, idx_y_p]
+            spoil_y_m = self.spoilage[b_idx, idx_x_c, idx_y_m]
+        else:
+            n_idx = torch.arange(self.n_drones, device=self.device).unsqueeze(0)
+            spoil_x_p = self.spoilage[b_idx, n_idx, idx_x_p, idx_y_c]
+            spoil_x_m = self.spoilage[b_idx, n_idx, idx_x_m, idx_y_c]
+            spoil_y_p = self.spoilage[b_idx, n_idx, idx_x_c, idx_y_p]
+            spoil_y_m = self.spoilage[b_idx, n_idx, idx_x_c, idx_y_m]
+            
+        # The gradient is counted as positive if the "+ offset" block is less fresh, more spoiled
+        grad_x = spoil_x_p - spoil_x_m
+        grad_y = spoil_y_p - spoil_y_m
+        
+        return grad_x, grad_y

@@ -33,6 +33,16 @@ GEN_GPU = 20
 SIM_STEPS = 500         
 VISU_STEPS = 1000      
 
+# Initial Conditions & Robustness
+N_INIT_CONDITIONS = 4     # Nombre de situations initiales différentes
+MIN_SPAWN_DIST = 2.0      # Distance minimale entre les drones à l'apparition
+
+# Distributed Memory & Exploration
+MAP_STRATEGY = "local_shared"       # "global" | "local_individual" | "local_shared"
+REFRESH_MAP_TICKS = 50              # Fréquence de partage (en nombre de dt)
+EXPLO_STRATEGY = "local_gradient"   # "local_gradient" | "global_closest"
+FOV_FACTOR = 1.0                    # Tangente du demi-angle du cône de vision (1.0 = angle de 45°)
+
 # Cost Function Weights
 if FULL_MILLING_MODE:
     SCENARIO = "default" # No grid exploration

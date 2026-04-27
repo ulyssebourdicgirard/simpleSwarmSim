@@ -20,18 +20,25 @@ def run_batch_pytorch(genes, device):
     torch.manual_seed(42)
     
     n_batch = genes['y_att'].shape[0]
+    n_envs = getattr(config, 'N_INIT_CONDITIONS', 4)
+    total_envs = n_batch * n_envs
+    
     pos, phi, v, vz = get_deterministic_initial_state(n_batch, NB_DRONES, device=device)
     
-    params = SwarmParams(**genes)
-    cost_total = torch.zeros(n_batch, device=device) # Init tensor for all costs in all swarms
+    expanded_genes = {}
+    for k, val in genes.items():
+        expanded_genes[k] = val.unsqueeze(1).expand(-1, n_envs, -1).reshape(total_envs, 1)
+        
+    params = SwarmParams(**expanded_genes)
+    cost_total = torch.zeros(total_envs, device=device) 
     
     grid = None 
     if config.SCENARIO == "exploration":
-        grid = TensorExplorationGrid(n_batch, config.ARENA_RADIUS, config.GRID_RES, device=device)
+        grid = TensorExplorationGrid(total_envs, NB_DRONES, config.ARENA_RADIUS, config.GRID_RES, device=device)
     
     # Integration loop
     for t in range(SIM_STEPS):
-        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz)
+        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, grid=grid)
         
         v += acc * DT
         phi += phi_dot * DT
@@ -44,6 +51,9 @@ def run_batch_pytorch(genes, device):
             
         if grid:
             grid.update(pos)
+            
+            if t % getattr(config, 'REFRESH_MAP_TICKS', 50) == 0:
+                grid.share_maps(pos, getattr(config, 'NEIGHBORS', 2)) # Sharing maps with neighbors
         
         # Post-transient metrics
         if t > 50:
@@ -53,7 +63,12 @@ def run_batch_pytorch(genes, device):
             if grid:
                 cost_total += grid.get_score() * config.W_EXPLO
 
-    return cost_total
+    # --- MIN-MAX ---
+    cost_total = cost_total.view(n_batch, n_envs)
+    
+    worst_costs, _ = torch.max(cost_total, dim=1) # keeping the worst costs to favor robustness
+
+    return worst_costs
 
 
 
@@ -66,15 +81,15 @@ def optimize_pytorch(device):
     # Init pop
     genes = {
         'y_att':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.001, 5.0),
-        'd0_att': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 4.0), # Augmenter distances pour permettre plus longue attraction
-        'l_att':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 5.0), # l_att >>> d0_att
+        'd0_att': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 8.0), # Augmenter distances pour permettre plus longue attraction
+        'l_att':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 12.0), # l_att >>> d0_att
         'y_ali':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.0, 4.0),
         'l_ali':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(1.0, 5.0),
         'y_f':    torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.001, 2.0), # Pas forcément variable
         'a_att':  torch.zeros((POP_SIZE_GPU, 1), device=device),
         'b1_att': torch.zeros((POP_SIZE_GPU, 1), device=device),
         'b2_att': torch.zeros((POP_SIZE_GPU, 1), device=device),
-        'd0_ali': torch.ones((POP_SIZE_GPU, 1), device=device),
+        'd0_ali': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 3.0),
         'a_ali':  torch.zeros((POP_SIZE_GPU, 1), device=device),
         'b1_ali': torch.zeros((POP_SIZE_GPU, 1), device=device),
         'b2_ali': torch.zeros((POP_SIZE_GPU, 1), device=device),
@@ -82,6 +97,7 @@ def optimize_pytorch(device):
         'y_acc': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.001, 2.0),
         'l_acc': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 4.0),
         'd0_v':  torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.5, 3.0),
+        'y_explo': torch.empty((POP_SIZE_GPU, 1), device=device).uniform_(0.0, 5.0), # exploration influence
     }
 
     sorted_idx = torch.arange(POP_SIZE_GPU, device=device)
@@ -185,7 +201,7 @@ def generate_final_data_pytorch(params, logger, device):
         if vz is not None:
             history_vz.append(vz.clone())
 
-        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz)
+        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, grid=grid)
         
         v += acc * DT
         phi += phi_dot * DT
@@ -204,7 +220,12 @@ def generate_final_data_pytorch(params, logger, device):
     if grid:
         score = grid.get_score().item()
         print(f"[PyTorch] Final Exploration Coverage: {score * 100:.2f}%")
-        final_cov = (1.0 - (grid.spoilage[0] / grid.MAX_SPOIL)).cpu().numpy()
+        
+        if grid.spoilage.dim() == 4:
+            merged_spoilage, _ = torch.min(grid.spoilage[0], dim=0)
+            final_cov = (1.0 - (merged_spoilage / grid.MAX_SPOIL)).cpu().numpy()
+        else:
+            final_cov = (1.0 - (grid.spoilage[0] / grid.MAX_SPOIL)).cpu().numpy()
         
     full_pos = torch.stack(history_pos).cpu().numpy()
     full_phi = torch.stack(history_phi).cpu().numpy()

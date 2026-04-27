@@ -34,6 +34,8 @@ class SwarmParams:
     y_acc: float = 1.0
     l_acc: float = 2.0
     d0_v: float = 1.0
+    # Exploration
+    y_explo: float = 0.0
 
 def get_deterministic_initial_state(n_batch, n_drones, xp=np):
     # Circle layout (Deterministic)

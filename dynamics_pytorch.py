@@ -106,8 +106,6 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
         d0_ali, a_ali, b1_ali, b2_ali = d0_ali.unsqueeze(-1), a_ali.unsqueeze(-1), b1_ali.unsqueeze(-1), b2_ali.unsqueeze(-1)
         y_acc, l_acc, d0_v = y_acc.unsqueeze(-1), l_acc.unsqueeze(-1), d0_v.unsqueeze(-1)
         
-        if isinstance(y_explo, torch.Tensor) and y_explo.dim() == 2:
-            y_explo = y_explo.unsqueeze(-1)
 
     # Broadcast (Batch, N, 1)
     if hasattr(y_att, 'ndim') and y_att.dim() == 2:
@@ -380,6 +378,7 @@ class TensorExplorationGrid:
         xs = torch.linspace(-self.radius + res/2, self.radius - res/2, self.size, device=self.device)
         ys = torch.linspace(-self.radius + res/2, self.radius - res/2, self.size, device=self.device)
         grid_x, grid_y = torch.meshgrid(xs, ys, indexing='ij')
+        # Format [1, 1, X, Y] for partial broadcasting (VRAM Optimization)
         self.grid_x = grid_x.view(1, 1, self.size, self.size)
         self.grid_y = grid_y.view(1, 1, self.size, self.size)
 
@@ -393,33 +392,37 @@ class TensorExplorationGrid:
         self.spoilage += self.spoil_add
         self.spoilage.clamp_(min=0.0, max=self.MAX_SPOIL)
         
-        # Distance calculation for FOV instead of simple spatial hashing
-        px = p[..., 0:1, None]
-        py = p[..., 1:2, None]
-        dist_sq = (self.grid_x - px)**2 + (self.grid_y - py)**2
-        
-        if p.shape[-1] == 3:
-            z = torch.clamp(p[..., 2:3, None], min=0.5)
-        else:
-            z = torch.full_like(px, self.SENSOR_H)
-            
-        # FOV geometry and Inverse Square Law intensity
         fov_factor = getattr(config, 'FOV_FACTOR', 1.0)
-        sigma = torch.clamp(z * fov_factor, min=self.res / 2.0)
-        intensity = (self.FRESH_RATE * self.SENSOR_H) / (z**2)
         
-        # Freshening matrix (Gaussian splat)
-        freshen_matrix = intensity * torch.exp(-dist_sq / (2.0 * sigma**2))
-        
-        if self.strategy == "global":
-            # Sequential writing to avoid conflicts -> Summing contributions for the global map
-            total_freshen = torch.sum(freshen_matrix, dim=1)
-            self.spoilage -= total_freshen
-            self.spoilage.clamp_(min=0.0)
-        else:
-            # each drone updates his own map
-            self.spoilage -= freshen_matrix
-            self.spoilage.clamp_(min=0.0)
+        for i in range(self.n_drones):
+            # Distance calculation for FOV instead of simple spatial hashing
+            px = p[:, i:i+1, 0:1, None]
+            py = p[:, i:i+1, 1:2, None]
+            
+            # Optimized VRAM usage
+            dist_sq = torch.sub(self.grid_x, px).pow_(2)
+            dist_sq.add_(torch.sub(self.grid_y, py).pow_(2))
+            
+            if p.shape[-1] == 3:
+                z = torch.clamp(p[:, i:i+1, 2:3, None], min=0.5)
+            else:
+                z = torch.full_like(px, self.SENSOR_H)
+                
+            # FOV geometry and Inverse Square Law intensity
+            sigma = torch.clamp(z * fov_factor, min=self.res / 2.0)
+            intensity = (self.FRESH_RATE * self.SENSOR_H) / (z**2)
+            
+            # Freshening matrix (Gaussian splat)
+            freshen_matrix = intensity * torch.exp(-dist_sq / (2.0 * sigma**2))
+            
+            if self.strategy == "global":
+                # Sequential writing to avoid conflicts -> Summing contributions for the global map
+                self.spoilage -= freshen_matrix.squeeze(1)
+            else:
+                # each drone updates his own map
+                self.spoilage[:, i:i+1] -= freshen_matrix
+                
+        self.spoilage.clamp_(min=0.0)
 
     @torch.no_grad()
     def share_maps(self, pos, neighbors_k):
@@ -436,14 +439,15 @@ class TensorExplorationGrid:
         _, top_indices = torch.topk(dist, neighbors_k, dim=-1, largest=False) # k closest neighbors
         
         new_spoilage = self.spoilage.clone()
-        batch_idx = torch.arange(pos.shape[0], device=self.device).view(-1, 1, 1)
+        batch_idx_1d = torch.arange(pos.shape[0], device=self.device)
         
-        for k in range(neighbors_k):
-            neighbor_idx = top_indices[..., k]
-            neighbor_map = self.spoilage[batch_idx, neighbor_idx]       # getting the neighbors's maps
-            new_spoilage = torch.minimum(new_spoilage, neighbor_map)    # keeping the best information (unilateral)
-            
-        self.spoilage = new_spoilage
+        for d in range(self.n_drones):
+            for k in range(neighbors_k):
+                n_idx = top_indices[:, d, k]
+                neighbor_map = self.spoilage[batch_idx_1d, n_idx]           # getting the neighbors's maps
+                torch.minimum(new_spoilage[:, d], neighbor_map, out=new_spoilage[:, d]) # keeping the best information (unilateral)
+                
+        self.spoilage.copy_(new_spoilage)
 
     @torch.no_grad()
     def get_score(self):

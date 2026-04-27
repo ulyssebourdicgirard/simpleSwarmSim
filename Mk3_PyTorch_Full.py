@@ -1,6 +1,7 @@
 import time
 import torch
 import config
+import concurrent.futures
 
 from config import NB_DRONES, ARENA_RADIUS, DT, SIM_STEPS, VISU_STEPS, POP_SIZE_GPU, GEN_GPU
 from dynamics_pytorch import SwarmParams, TensorExplorationGrid, compute_derivatives, get_deterministic_initial_state, compute_metrics
@@ -8,12 +9,19 @@ from logger import ExperimentLogger
 from visualization import generate_gif_from_log
 
 # Hardware routing
+devices = []
 if torch.cuda.is_available():
-    device = torch.device("cuda")
+    n_gpus = torch.cuda.device_count()
+    print(f"[Hardware] Found {n_gpus} CUDA device(s).")
+    devices = [torch.device(f"cuda:{i}") for i in range(n_gpus)]
 elif torch.backends.mps.is_available():
-    device = torch.device("mps")
+    print("[Hardware] Using Apple MPS.")
+    devices = [torch.device("mps")]
 else:
-    device = torch.device("cpu")
+    print("[Hardware] Using CPU.")
+    devices = [torch.device("cpu")]
+    
+primary_device = devices[0]
 
 def run_batch_pytorch(genes, device):
     # Frozen noise
@@ -72,11 +80,14 @@ def run_batch_pytorch(genes, device):
 
 
 
-def optimize_pytorch(device):
-    logger = ExperimentLogger(mode=f"PyTorch_{device.type.upper()}")
+def optimize_pytorch(devices):
+    device = devices[0] # Master GPU
+    
+    mode_str = f"PyTorch_MULTI_{len(devices)}xGPU" if len(devices) > 1 else f"PyTorch_{device.type.upper()}"
+    logger = ExperimentLogger(mode=mode_str)
     logger.log_config(config)
     
-    print(f"--- PyTorch GA (Pop: {POP_SIZE_GPU}) | Device: {device} | Log: {logger.log_dir} ---")
+    print(f"--- PyTorch GA (Pop: {POP_SIZE_GPU}) | Devices: {[d.type + (str(d.index) if d.index is not None else '') for d in devices]} | Log: {logger.log_dir} ---")
     
     # Init pop
     genes = {
@@ -108,14 +119,31 @@ def optimize_pytorch(device):
         t0 = time.time()
         
         # Eval
-        costs = run_batch_pytorch(genes, device)
-        
-        # Sync
-        if device.type == 'cuda':
-            torch.cuda.synchronize()
-        elif device.type == 'mps':
-            torch.mps.synchronize()
+        if len(devices) > 1:
+            chunks = [{} for _ in range(len(devices))]
+            for k, v in genes.items():
+                split_v = torch.tensor_split(v, len(devices))
+                for i, dev in enumerate(devices):
+                    chunks[i][k] = split_v[i].to(dev)
             
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(devices)) as executor:
+                futures = [executor.submit(run_batch_pytorch, chunks[i], devices[i]) for i in range(len(devices))]
+                costs_chunks = [f.result() for f in futures]
+                
+            costs = torch.cat([c.to(device) for c in costs_chunks])
+            
+            # Sync multi-GPU
+            for dev in devices:
+                if dev.type == 'cuda':
+                    torch.cuda.synchronize(dev)
+        else:
+            costs = run_batch_pytorch(genes, device)
+            # Sync single-GPU
+            if device.type == 'cuda':
+                torch.cuda.synchronize(device)
+            elif device.type == 'mps':
+                torch.mps.synchronize()
+                
         dt = time.time() - t0
         
         # Sort
@@ -187,14 +215,20 @@ def generate_final_data_pytorch(params, logger, device):
     # Init state
     pos, phi, v, vz = get_deterministic_initial_state(1, NB_DRONES, device=device)
     
+    pos = pos[0:1]
+    phi = phi[0:1]
+    v = v[0:1]
+    if vz is not None:
+        vz = vz[0:1]
+    
     history_pos, history_phi, history_v, history_vz = [], [], [], []
     
     grid = None
     if config.SCENARIO == "exploration":
-        grid = TensorExplorationGrid(1, config.ARENA_RADIUS, config.GRID_RES, device=device)
+        grid = TensorExplorationGrid(1, NB_DRONES, config.ARENA_RADIUS, config.GRID_RES, device=device)
     
     # Visu loop
-    for _ in range(VISU_STEPS): 
+    for t in range(VISU_STEPS): 
         history_pos.append(pos.clone())
         history_phi.append(phi.clone())
         history_v.append(v.clone())
@@ -215,6 +249,9 @@ def generate_final_data_pytorch(params, logger, device):
         if grid:
             grid.update(pos)
             
+            if t % getattr(config, 'REFRESH_MAP_TICKS', 50) == 0:
+                grid.share_maps(pos, getattr(config, 'NEIGHBORS', 2))
+            
     # Host transfer
     final_cov = None
     if grid:
@@ -227,15 +264,15 @@ def generate_final_data_pytorch(params, logger, device):
         else:
             final_cov = (1.0 - (grid.spoilage[0] / grid.MAX_SPOIL)).cpu().numpy()
         
-    full_pos = torch.stack(history_pos).cpu().numpy()
-    full_phi = torch.stack(history_phi).cpu().numpy()
-    full_v   = torch.stack(history_v).cpu().numpy()
-    full_vz  = torch.stack(history_vz).cpu().numpy() if vz is not None else None
+    full_pos = torch.stack(history_pos).squeeze(1).cpu().numpy()
+    full_phi = torch.stack(history_phi).squeeze(1).cpu().numpy()
+    full_v   = torch.stack(history_v).squeeze(1).cpu().numpy()
+    full_vz  = torch.stack(history_vz).squeeze(1).cpu().numpy() if vz is not None else None
     
     # Log
     logger.save_trajectory(full_pos, full_phi, full_v, params, vz=full_vz, coverage=final_cov)
 
 if __name__ == "__main__":
-    best_p, logger = optimize_pytorch(device)
-    generate_final_data_pytorch(best_p, logger, device)
+    best_p, logger = optimize_pytorch(devices)
+    generate_final_data_pytorch(best_p, logger, primary_device)
     generate_gif_from_log(logger.log_dir)

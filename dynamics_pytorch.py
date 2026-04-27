@@ -99,22 +99,12 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
     y_explo = getattr(p, 'y_explo', 0.0)
 
     # Broadcast (Batch, N, 1)
-    if hasattr(y_att, 'ndim') and y_att.dim() == 2:
+    if isinstance(y_att, torch.Tensor) and y_att.dim() == 2:
         y_att, y_ali = y_att.unsqueeze(-1), y_ali.unsqueeze(-1)
         d0_att, l_att, l_ali = d0_att.unsqueeze(-1), l_att.unsqueeze(-1), l_ali.unsqueeze(-1)
         a_att, b1_att, b2_att = a_att.unsqueeze(-1), b1_att.unsqueeze(-1), b2_att.unsqueeze(-1)
         d0_ali, a_ali, b1_ali, b2_ali = d0_ali.unsqueeze(-1), a_ali.unsqueeze(-1), b1_ali.unsqueeze(-1), b2_ali.unsqueeze(-1)
         y_acc, l_acc, d0_v = y_acc.unsqueeze(-1), l_acc.unsqueeze(-1), d0_v.unsqueeze(-1)
-        
-
-    # Broadcast (Batch, N, 1)
-    if hasattr(y_att, 'ndim') and y_att.dim() == 2:
-        y_att, y_ali = y_att.unsqueeze(-1), y_ali.unsqueeze(-1)
-        d0_att, l_att, l_ali = d0_att.unsqueeze(-1), l_att.unsqueeze(-1), l_ali.unsqueeze(-1)
-        a_att, b1_att, b2_att = a_att.unsqueeze(-1), b1_att.unsqueeze(-1), b2_att.unsqueeze(-1)
-        d0_ali, a_ali, b1_ali, b2_ali = d0_ali.unsqueeze(-1), a_ali.unsqueeze(-1), b1_ali.unsqueeze(-1), b2_ali.unsqueeze(-1)
-        y_acc, l_acc, d0_v = y_acc.unsqueeze(-1), l_acc.unsqueeze(-1), d0_v.unsqueeze(-1)
-        
         
         
     # Wall interaction (Cylindrical Arena)
@@ -242,11 +232,7 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
     # Noise addition
     noise = torch.empty_like(phi).uniform_(-0.1, 0.1)
     
-    
-    phi_dot_social = torch.clamp(social_sum + phi_dot_explo + noise, -3.0, 3.0) # With added exploration force
-    phi_dot_vital = torch.clamp(rep_sum + w_force, -10.0, 10.0)
-    
-    phi_dot_social = torch.clamp(social_sum + noise, -3.0, 3.0)
+    phi_dot_social = torch.clamp(social_sum + phi_dot_explo + noise, -3.0, 3.0)
     phi_dot_vital = torch.clamp(rep_sum + w_force, -10.0, 10.0)
     
     # Raw command & clamp

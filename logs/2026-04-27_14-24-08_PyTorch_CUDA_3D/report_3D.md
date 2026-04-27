@@ -1,5 +1,5 @@
 # Experiment Report - PyTorch_CUDA (3D)
-**Date:** 2026-04-27_13-12-06
+**Date:** 2026-04-27_14-24-08
 
 ## 1. Initial Configuration
 | Parameter | Value |
@@ -42,4 +42,3 @@
 ## 2. Optimization Evolution
 | Gen  |  Best Cost   |  Time (s)  |                                                                All Parameters                                                                |
 | :--: | :----------: | :--------: | :------------------------------------------------------------------------------------------------------------------------------------------ |
-| 00   | -8546.4736   | 112.66     | y_att=1.84, y_ali=1.18, y_f=1.10, d0_att=3.13, l_att=2.78, l_ali=1.11, a_att=0.00, b1_att=0.00, b2_att=0.00, d0_ali=2.60, a_ali=0.00, b1_ali=0.00, b2_ali=0.00, y_z=1.00, l_z=3.00, a_z=1.00, d0_z=0.50, sigma_z=1.00, y_z_w=2.00, dz_w=1.00, y_z_nav=1.00, y_vz_nav=1.00, target_altitude=7.92, y_acc=0.08, l_acc=0.80, d0_v=1.78, y_explo=0.53 |

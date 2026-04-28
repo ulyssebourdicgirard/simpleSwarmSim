@@ -9,3 +9,6 @@ venv/
 
 # Apple 
 .DS_Store
+
+#Weird files
+*.un~

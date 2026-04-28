@@ -10,7 +10,7 @@ class ExperimentLogger:
         
         # Timestamp
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.log_dir = os.path.join("logs", f"{timestamp}_{mode}_{self.suffix}")
+        self.log_dir = os.path.join(os.getenv('LOG_DIR_OVERRIDE', "logs"), f"{timestamp}_{mode}_{self.suffix}")
         os.makedirs(self.log_dir, exist_ok=True)
         
         # Files

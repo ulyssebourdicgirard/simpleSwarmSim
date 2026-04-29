@@ -1,0 +1,206 @@
+[Hardware] Found 2 CUDA device(s).
+--- PyTorch GA (Pop: 5000) | Devices: ['cuda0', 'cuda1'] | Log: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-20-20_PyTorch_MULTI_2xGPU_3D ---
+Gen 00 | Cost: -5058.01 | T: 17.51s
+Gen 01 | Cost: -5058.01 | T: 17.19s
+Gen 02 | Cost: -5058.01 | T: 17.19s
+Gen 03 | Cost: -5287.32 | T: 17.19s
+Gen 04 | Cost: -5287.32 | T: 17.20s
+Gen 05 | Cost: -5287.32 | T: 17.20s
+Gen 06 | Cost: -5287.32 | T: 17.21s
+Gen 07 | Cost: -5287.32 | T: 17.21s
+Gen 08 | Cost: -5287.32 | T: 17.22s
+Gen 09 | Cost: -5287.32 | T: 17.22s
+Gen 10 | Cost: -5287.32 | T: 17.22s
+Gen 11 | Cost: -5287.32 | T: 17.22s
+Gen 12 | Cost: -5287.32 | T: 17.22s
+Gen 13 | Cost: -5287.32 | T: 17.22s
+Gen 14 | Cost: -5287.32 | T: 17.22s
+Gen 15 | Cost: -5287.32 | T: 17.22s
+Gen 16 | Cost: -5287.32 | T: 17.22s
+Gen 17 | Cost: -5287.32 | T: 17.22s
+Gen 18 | Cost: -5287.32 | T: 17.22s
+Gen 19 | Cost: -5287.32 | T: 17.22s
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 34.30%
+
+[Logger] Trajectory saved: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-20-20_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz
+[Visu] Loading logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-20-20_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz...
+[Visu] Generating GIF: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-20-20_PyTorch_MULTI_2xGPU_3D/animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 2 CUDA device(s).
+--- PyTorch GA (Pop: 5000) | Devices: ['cuda0', 'cuda1'] | Log: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-27-23_PyTorch_MULTI_2xGPU_3D ---
+Gen 00 | Cost: -4778.72 | T: 17.53s
+Gen 01 | Cost: -4908.34 | T: 17.21s
+Gen 02 | Cost: -5059.57 | T: 17.21s
+Gen 03 | Cost: -5077.28 | T: 17.21s
+Gen 04 | Cost: -5077.28 | T: 17.22s
+Gen 05 | Cost: -5180.67 | T: 17.22s
+Gen 06 | Cost: -5180.67 | T: 17.22s
+Gen 07 | Cost: -5180.67 | T: 17.23s
+Gen 08 | Cost: -5180.67 | T: 17.23s
+Gen 09 | Cost: -5253.47 | T: 17.23s
+Gen 10 | Cost: -5253.47 | T: 17.23s
+Gen 11 | Cost: -5253.47 | T: 17.23s
+Gen 12 | Cost: -5253.47 | T: 17.23s
+Gen 13 | Cost: -5253.47 | T: 17.23s
+Gen 14 | Cost: -5253.47 | T: 17.23s
+Gen 15 | Cost: -5253.47 | T: 17.23s
+Gen 16 | Cost: -5264.93 | T: 17.23s
+Gen 17 | Cost: -5264.93 | T: 17.23s
+Gen 18 | Cost: -5266.80 | T: 17.23s
+Gen 19 | Cost: -5344.55 | T: 17.23s
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 36.29%
+
+[Logger] Trajectory saved: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-27-23_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz
+[Visu] Loading logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-27-23_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz...
+[Visu] Generating GIF: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-27-23_PyTorch_MULTI_2xGPU_3D/animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 2 CUDA device(s).
+--- PyTorch GA (Pop: 5000) | Devices: ['cuda0', 'cuda1'] | Log: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-34-27_PyTorch_MULTI_2xGPU_3D ---
+Gen 00 | Cost: -4524.76 | T: 23.55s
+Gen 01 | Cost: -4524.76 | T: 23.22s
+Gen 02 | Cost: -4524.76 | T: 23.23s
+Gen 03 | Cost: -4524.76 | T: 23.23s
+Gen 04 | Cost: -4604.07 | T: 23.23s
+Gen 05 | Cost: -4633.32 | T: 23.23s
+Gen 06 | Cost: -4671.73 | T: 23.23s
+Gen 07 | Cost: -4671.73 | T: 23.23s
+Gen 08 | Cost: -4728.34 | T: 23.23s
+Gen 09 | Cost: -4761.89 | T: 23.23s
+Gen 10 | Cost: -4781.69 | T: 23.23s
+Gen 11 | Cost: -4789.12 | T: 23.23s
+Gen 12 | Cost: -4829.83 | T: 23.23s
+Gen 13 | Cost: -4902.32 | T: 23.23s
+Gen 14 | Cost: -4902.32 | T: 23.23s
+Gen 15 | Cost: -4902.32 | T: 23.22s
+Gen 16 | Cost: -4902.32 | T: 23.23s
+Gen 17 | Cost: -4902.32 | T: 23.22s
+Gen 18 | Cost: -4902.32 | T: 23.22s
+Gen 19 | Cost: -4902.32 | T: 23.23s
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 34.49%
+
+[Logger] Trajectory saved: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-34-27_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz
+[Visu] Loading logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-34-27_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz...
+[Visu] Generating GIF: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-34-27_PyTorch_MULTI_2xGPU_3D/animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 2 CUDA device(s).
+--- PyTorch GA (Pop: 5000) | Devices: ['cuda0', 'cuda1'] | Log: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-43-32_PyTorch_MULTI_2xGPU_3D ---
+Gen 00 | Cost: -4423.77 | T: 23.53s
+Gen 01 | Cost: -4423.77 | T: 23.23s
+Gen 02 | Cost: -4616.22 | T: 23.23s
+Gen 03 | Cost: -4616.22 | T: 23.23s
+Gen 04 | Cost: -4632.44 | T: 23.23s
+Gen 05 | Cost: -4699.26 | T: 23.23s
+Gen 06 | Cost: -4746.66 | T: 23.23s
+Gen 07 | Cost: -4746.66 | T: 23.23s
+Gen 08 | Cost: -4746.66 | T: 23.23s
+Gen 09 | Cost: -4761.88 | T: 23.23s
+Gen 10 | Cost: -4781.86 | T: 23.23s
+Gen 11 | Cost: -4840.39 | T: 23.22s
+Gen 12 | Cost: -4840.39 | T: 23.22s
+Gen 13 | Cost: -4840.39 | T: 23.22s
+Gen 14 | Cost: -4840.39 | T: 23.22s
+Gen 15 | Cost: -4840.39 | T: 23.22s
+Gen 16 | Cost: -4840.39 | T: 23.23s
+Gen 17 | Cost: -4840.39 | T: 23.23s
+Gen 18 | Cost: -4869.83 | T: 23.22s
+Gen 19 | Cost: -4869.83 | T: 23.23s
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 36.01%
+
+[Logger] Trajectory saved: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-43-32_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz
+[Visu] Loading logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-43-32_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz...
+[Visu] Generating GIF: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-43-32_PyTorch_MULTI_2xGPU_3D/animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 2 CUDA device(s).
+--- PyTorch GA (Pop: 5000) | Devices: ['cuda0', 'cuda1'] | Log: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-52-36_PyTorch_MULTI_2xGPU_3D ---
+Gen 00 | Cost: -4492.26 | T: 23.79s
+Gen 01 | Cost: -4621.16 | T: 23.44s
+Gen 02 | Cost: -4621.16 | T: 23.45s
+Gen 03 | Cost: -4831.92 | T: 23.44s
+Gen 04 | Cost: -4831.92 | T: 23.45s
+Gen 05 | Cost: -4831.92 | T: 23.45s
+Gen 06 | Cost: -4831.92 | T: 23.45s
+Gen 07 | Cost: -4831.92 | T: 23.45s
+Gen 08 | Cost: -4831.92 | T: 23.45s
+Gen 09 | Cost: -4846.91 | T: 23.44s
+Gen 10 | Cost: -4883.05 | T: 23.44s
+Gen 11 | Cost: -4883.05 | T: 23.44s
+Gen 12 | Cost: -4905.30 | T: 23.44s
+Gen 13 | Cost: -4912.17 | T: 23.44s
+Gen 14 | Cost: -4939.70 | T: 23.44s
+Gen 15 | Cost: -4939.70 | T: 23.44s
+Gen 16 | Cost: -4939.70 | T: 23.44s
+Gen 17 | Cost: -4939.70 | T: 23.44s
+Gen 18 | Cost: -4989.41 | T: 23.44s
+Gen 19 | Cost: -4989.41 | T: 23.44s
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 37.91%
+
+[Logger] Trajectory saved: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-52-36_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz
+[Visu] Loading logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-52-36_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz...
+[Visu] Generating GIF: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_08-52-36_PyTorch_MULTI_2xGPU_3D/animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 2 CUDA device(s).
+--- PyTorch GA (Pop: 5000) | Devices: ['cuda0', 'cuda1'] | Log: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_09-01-44_PyTorch_MULTI_2xGPU_3D ---
+Gen 00 | Cost: -4350.33 | T: 23.81s
+Gen 01 | Cost: -4622.12 | T: 23.44s
+Gen 02 | Cost: -4622.12 | T: 23.45s
+Gen 03 | Cost: -4628.28 | T: 23.45s
+Gen 04 | Cost: -4736.01 | T: 23.45s
+Gen 05 | Cost: -4736.01 | T: 23.45s
+Gen 06 | Cost: -4786.46 | T: 23.45s
+Gen 07 | Cost: -4794.31 | T: 23.45s
+Gen 08 | Cost: -4857.62 | T: 23.45s
+Gen 09 | Cost: -4857.62 | T: 23.45s
+Gen 10 | Cost: -4857.62 | T: 23.44s
+Gen 11 | Cost: -4880.26 | T: 23.44s
+Gen 12 | Cost: -4880.26 | T: 23.44s
+Gen 13 | Cost: -4966.23 | T: 23.44s
+Gen 14 | Cost: -4966.23 | T: 23.44s
+Gen 15 | Cost: -4966.23 | T: 23.44s
+Gen 16 | Cost: -4966.23 | T: 23.44s
+Gen 17 | Cost: -4966.23 | T: 23.44s
+Gen 18 | Cost: -4966.23 | T: 23.44s
+Gen 19 | Cost: -4966.23 | T: 23.44s
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 36.96%
+
+[Logger] Trajectory saved: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_09-01-44_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz
+[Visu] Loading logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_09-01-44_PyTorch_MULTI_2xGPU_3D/trajectory_3D.npz...
+[Visu] Generating GIF: logs/2026-04-29_08-20-19_explo_sweep/2026-04-29_09-01-44_PyTorch_MULTI_2xGPU_3D/animation_3D.gif (patience...)
+[Visu] Done.
+
+>>> Stratégie de partage de la carte: global
+
+>>> Stratégie d'exploration: local_gradient
+
+>>> Stratégie de partage de la carte: global
+
+>>> Stratégie d'exploration: global_closest
+
+>>> Stratégie de partage de la carte: local_individual
+
+>>> Stratégie d'exploration: local_gradient
+
+>>> Stratégie de partage de la carte: local_individual
+
+>>> Stratégie d'exploration: global_closest
+
+>>> Stratégie de partage de la carte: local_shared
+
+>>> Stratégie d'exploration: local_gradient
+
+>>> Stratégie de partage de la carte: local_shared
+
+>>> Stratégie d'exploration: global_closest
+
+>>> Balayage terminé.

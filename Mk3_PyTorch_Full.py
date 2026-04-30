@@ -121,6 +121,7 @@ def optimize_pytorch(devices):
     sorted_idx = torch.arange(POP_SIZE_GPU, device=device)
     global_best_cost = float('inf')
     global_best_params = {}
+    global_best_cov = 0.0
     
     for gen in range(GEN_GPU):
         t0 = time.time()
@@ -168,9 +169,9 @@ def optimize_pytorch(devices):
         if best_cost < global_best_cost:
             global_best_cost = best_cost
             global_best_params = {k: genes[k][best_idx].clone() for k in genes}
+            global_best_cov = best_cov_val
             
-        print(f"Gen {gen:02d} | Cost: {global_best_cost:.2f} | T: {dt:.2f}s | Best exploration rate : {best_cov_val:.1f}%")
-        
+        print(f"Gen {gen:02d} | Cost: {global_best_cost:.2f} | T: {dt:.2f}s | Best exploration rate : {global_best_cov:.1f}%")        
         # Log
         current_best = SwarmParams(**{k: v.item() for k, v in global_best_params.items()})
         logger.log_generation(gen, global_best_cost, dt, current_best)

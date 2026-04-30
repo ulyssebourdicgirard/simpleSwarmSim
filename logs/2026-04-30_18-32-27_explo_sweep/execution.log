@@ -1,0 +1,146 @@
+[Hardware] Found 1 CUDA device(s).
+--- PyTorch GA (Pop: 1000) | Devices: ['cuda0'] | Log: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-32-30_PyTorch_CUDA_3D ---
+Gen 00 | Cost: -3323.57 | T: 26.53s | Best exploration rate : 23.3%
+Gen 01 | Cost: -3465.59 | T: 26.45s | Best exploration rate : 24.6%
+Gen 02 | Cost: -3494.01 | T: 26.50s | Best exploration rate : 25.6%
+Gen 03 | Cost: -3533.61 | T: 26.54s | Best exploration rate : 25.3%
+Gen 04 | Cost: -3566.87 | T: 26.51s | Best exploration rate : 25.3%
+Gen 05 | Cost: -3652.00 | T: 26.57s | Best exploration rate : 26.5%
+Gen 06 | Cost: -3782.17 | T: 26.56s | Best exploration rate : 26.9%
+Gen 07 | Cost: -3782.17 | T: 26.56s | Best exploration rate : 26.9%
+Gen 08 | Cost: -3782.17 | T: 26.57s | Best exploration rate : 26.9%
+Gen 09 | Cost: -3782.17 | T: 26.55s | Best exploration rate : 26.9%
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 22.51%
+
+[Logger] Trajectory saved: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-32-30_PyTorch_CUDA_3D\trajectory_3D.npz
+[Visu] Loading logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-32-30_PyTorch_CUDA_3D\trajectory_3D.npz...
+[Visu] Generating GIF: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-32-30_PyTorch_CUDA_3D\animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 1 CUDA device(s).
+--- PyTorch GA (Pop: 1000) | Devices: ['cuda0'] | Log: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-38-27_PyTorch_CUDA_3D ---
+Gen 00 | Cost: -3056.09 | T: 49.10s | Best exploration rate : 24.1%
+Gen 01 | Cost: -3176.25 | T: 48.98s | Best exploration rate : 24.3%
+Gen 02 | Cost: -3422.80 | T: 49.02s | Best exploration rate : 25.2%
+Gen 03 | Cost: -3664.51 | T: 49.08s | Best exploration rate : 25.8%
+Gen 04 | Cost: -3664.51 | T: 49.08s | Best exploration rate : 25.8%
+Gen 05 | Cost: -3679.53 | T: 49.09s | Best exploration rate : 25.2%
+Gen 06 | Cost: -3679.53 | T: 49.12s | Best exploration rate : 25.2%
+Gen 07 | Cost: -3679.53 | T: 49.13s | Best exploration rate : 25.2%
+Gen 08 | Cost: -3679.53 | T: 49.15s | Best exploration rate : 25.2%
+Gen 09 | Cost: -3679.53 | T: 49.12s | Best exploration rate : 25.2%
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 15.74%
+
+[Logger] Trajectory saved: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-38-27_PyTorch_CUDA_3D\trajectory_3D.npz
+[Visu] Loading logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-38-27_PyTorch_CUDA_3D\trajectory_3D.npz...
+[Visu] Generating GIF: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-38-27_PyTorch_CUDA_3D\animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 1 CUDA device(s).
+--- PyTorch GA (Pop: 1000) | Devices: ['cuda0'] | Log: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-48-09_PyTorch_CUDA_3D ---
+Gen 00 | Cost: -3168.45 | T: 35.89s | Best exploration rate : 21.8%
+Gen 01 | Cost: -3232.52 | T: 35.74s | Best exploration rate : 25.0%
+Gen 02 | Cost: -3351.70 | T: 35.81s | Best exploration rate : 22.7%
+Gen 03 | Cost: -3389.54 | T: 35.80s | Best exploration rate : 24.4%
+Gen 04 | Cost: -3393.27 | T: 35.81s | Best exploration rate : 25.0%
+Gen 05 | Cost: -3442.83 | T: 35.86s | Best exploration rate : 25.2%
+Gen 06 | Cost: -3472.35 | T: 35.82s | Best exploration rate : 25.5%
+Gen 07 | Cost: -3472.35 | T: 35.82s | Best exploration rate : 25.5%
+Gen 08 | Cost: -3499.28 | T: 35.81s | Best exploration rate : 25.9%
+Gen 09 | Cost: -3499.28 | T: 35.84s | Best exploration rate : 25.9%
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 23.78%
+
+[Logger] Trajectory saved: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-48-09_PyTorch_CUDA_3D\trajectory_3D.npz
+[Visu] Loading logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-48-09_PyTorch_CUDA_3D\trajectory_3D.npz...
+[Visu] Generating GIF: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-48-09_PyTorch_CUDA_3D\animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 1 CUDA device(s).
+--- PyTorch GA (Pop: 1000) | Devices: ['cuda0'] | Log: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-55-40_PyTorch_CUDA_3D ---
+Gen 00 | Cost: -3102.38 | T: 58.87s | Best exploration rate : 25.1%
+Gen 01 | Cost: -3155.14 | T: 58.74s | Best exploration rate : 24.9%
+Gen 02 | Cost: -3405.74 | T: 58.77s | Best exploration rate : 21.7%
+Gen 03 | Cost: -3405.74 | T: 58.80s | Best exploration rate : 21.7%
+Gen 04 | Cost: -3440.80 | T: 58.83s | Best exploration rate : 26.0%
+Gen 05 | Cost: -3440.80 | T: 58.83s | Best exploration rate : 26.0%
+Gen 06 | Cost: -3440.80 | T: 58.83s | Best exploration rate : 26.0%
+Gen 07 | Cost: -3467.56 | T: 58.81s | Best exploration rate : 24.3%
+Gen 08 | Cost: -3475.26 | T: 58.84s | Best exploration rate : 25.3%
+Gen 09 | Cost: -3514.36 | T: 58.86s | Best exploration rate : 26.1%
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 25.17%
+
+[Logger] Trajectory saved: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-55-40_PyTorch_CUDA_3D\trajectory_3D.npz
+[Visu] Loading logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-55-40_PyTorch_CUDA_3D\trajectory_3D.npz...
+[Visu] Generating GIF: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_18-55-40_PyTorch_CUDA_3D\animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 1 CUDA device(s).
+--- PyTorch GA (Pop: 1000) | Devices: ['cuda0'] | Log: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_19-07-03_PyTorch_CUDA_3D ---
+Gen 00 | Cost: -3431.91 | T: 36.24s | Best exploration rate : 24.0%
+Gen 01 | Cost: -3431.91 | T: 36.13s | Best exploration rate : 24.0%
+Gen 02 | Cost: -3431.91 | T: 36.15s | Best exploration rate : 24.0%
+Gen 03 | Cost: -3457.80 | T: 36.17s | Best exploration rate : 24.9%
+Gen 04 | Cost: -3457.80 | T: 36.17s | Best exploration rate : 24.9%
+Gen 05 | Cost: -3457.80 | T: 36.18s | Best exploration rate : 24.9%
+Gen 06 | Cost: -3457.80 | T: 36.09s | Best exploration rate : 24.9%
+Gen 07 | Cost: -3458.16 | T: 36.08s | Best exploration rate : 24.9%
+Gen 08 | Cost: -3462.96 | T: 36.06s | Best exploration rate : 25.3%
+Gen 09 | Cost: -3480.41 | T: 36.03s | Best exploration rate : 25.1%
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 23.89%
+
+[Logger] Trajectory saved: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_19-07-03_PyTorch_CUDA_3D\trajectory_3D.npz
+[Visu] Loading logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_19-07-03_PyTorch_CUDA_3D\trajectory_3D.npz...
+[Visu] Generating GIF: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_19-07-03_PyTorch_CUDA_3D\animation_3D.gif (patience...)
+[Visu] Done.
+[Hardware] Found 1 CUDA device(s).
+--- PyTorch GA (Pop: 1000) | Devices: ['cuda0'] | Log: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_19-14-29_PyTorch_CUDA_3D ---
+Gen 00 | Cost: -3205.24 | T: 59.04s | Best exploration rate : 24.1%
+Gen 01 | Cost: -3205.24 | T: 58.77s | Best exploration rate : 24.1%
+Gen 02 | Cost: -3470.22 | T: 58.80s | Best exploration rate : 25.0%
+Gen 03 | Cost: -3470.22 | T: 58.85s | Best exploration rate : 25.0%
+Gen 04 | Cost: -3470.22 | T: 58.82s | Best exploration rate : 25.0%
+Gen 05 | Cost: -3470.22 | T: 58.89s | Best exploration rate : 25.0%
+Gen 06 | Cost: -3594.20 | T: 58.90s | Best exploration rate : 24.9%
+Gen 07 | Cost: -3594.20 | T: 58.86s | Best exploration rate : 24.9%
+Gen 08 | Cost: -3735.48 | T: 58.82s | Best exploration rate : 26.4%
+Gen 09 | Cost: -3735.48 | T: 58.84s | Best exploration rate : 26.4%
+
+[PyTorch] Generating final trajectory...
+[PyTorch] Final Exploration Coverage: 19.01%
+
+[Logger] Trajectory saved: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_19-14-29_PyTorch_CUDA_3D\trajectory_3D.npz
+[Visu] Loading logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_19-14-29_PyTorch_CUDA_3D\trajectory_3D.npz...
+[Visu] Generating GIF: logs\2026-04-30_18-32-27_explo_sweep\2026-04-30_19-14-29_PyTorch_CUDA_3D\animation_3D.gif (patience...)
+[Visu] Done.
+
+>>> Stratégie de partage de la carte: global
+
+>>> Stratégie d'exploration: local_gradient
+
+>>> Stratégie de partage de la carte: global
+
+>>> Stratégie d'exploration: global_best
+
+>>> Stratégie de partage de la carte: local_individual
+
+>>> Stratégie d'exploration: local_gradient
+
+>>> Stratégie de partage de la carte: local_individual
+
+>>> Stratégie d'exploration: global_best
+
+>>> Stratégie de partage de la carte: local_shared
+
+>>> Stratégie d'exploration: local_gradient
+
+>>> Stratégie de partage de la carte: local_shared
+
+>>> Stratégie d'exploration: global_best
+
+>>> Balayage terminé.

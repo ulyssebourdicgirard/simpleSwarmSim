@@ -5,8 +5,8 @@ ENABLE_3D = True    # True: 3D, False: 2D
 Z_MIN = 1.0     
 Z_MAX = 10.0 
 DT = 0.1             # ADVICE : for 3D simulations, use less than 0.1   
-ARENA_RADIUS = 100.0
-NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 5))         
+ARENA_RADIUS = 120.0
+NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 10))         
 MAX_SPEED = 20.0     
                     # NEIGHBORS = None for no limit (bypasses partition for better performance)
 NEIGHBORS = 2       # Number of closest neighbors taken into account for interactions
@@ -27,7 +27,7 @@ SPOIL_ADD = 0.05
 POP_SIZE_CPU = 150        
 GEN_CPU = 20              
 
-POP_SIZE_GPU = 250   # PyTorch uses this one   
+POP_SIZE_GPU = 1000   # PyTorch uses this one   
 GEN_GPU = 10             
 
 SIM_STEPS = 500         

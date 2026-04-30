@@ -5,7 +5,7 @@ import datetime
 
 # Configurations to test
 map_strategy = ["global", "local_individual", "local_shared"]
-explo_strategy = ["local_gradient", "global_closest"]
+explo_strategy = ["local_gradient", "global_best"]
 
 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 log_dir = os.path.join("logs", f"{timestamp}_explo_sweep")
@@ -24,7 +24,6 @@ with open(log_file, 'w') as out_file, open(error_file, 'w') as err_file:
             print(f"\n>>> Stratégie de partage de la carte: {m_strat}", file=out_file)
             print(f"\n>>> Stratégie d'exploration: {e_strat}", file=out_file)
 
-            # Calling main script
             try:
                 subprocess.run(
                 [sys.executable, "Mk3_PyTorch_Full.py"],

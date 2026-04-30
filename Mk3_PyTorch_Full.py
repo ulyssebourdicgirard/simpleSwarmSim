@@ -2,6 +2,7 @@ import time
 import torch
 import config
 import concurrent.futures
+import numpy as np
 
 from config import NB_DRONES, ARENA_RADIUS, DT, SIM_STEPS, VISU_STEPS, POP_SIZE_GPU, GEN_GPU
 from dynamics_pytorch import SwarmParams, TensorExplorationGrid, compute_derivatives, get_deterministic_initial_state, compute_metrics
@@ -76,7 +77,13 @@ def run_batch_pytorch(genes, device):
     
     worst_costs, _ = torch.max(cost_total, dim=1) # keeping the worst costs to favor robustness
 
-    return worst_costs
+    final_covs = None
+    if grid:
+        covs = grid.get_coverage() 
+        covs = covs.view(n_batch, n_envs)
+        final_covs = torch.mean(covs, dim=1) # Average genome coverage
+        
+    return worst_costs, final_covs
 
 
 
@@ -128,16 +135,22 @@ def optimize_pytorch(devices):
             
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(devices)) as executor:
                 futures = [executor.submit(run_batch_pytorch, chunks[i], devices[i]) for i in range(len(devices))]
-                costs_chunks = [f.result() for f in futures]
+                results = [f.result() for f in futures]
+                costs_chunks = [r[0] for r in results]
+                covs_chunks = [r[1] for r in results]
                 
             costs = torch.cat([c.to(device) for c in costs_chunks])
+            if covs_chunks[0] is not None:
+                covs = torch.cat([c.to(device) for c in covs_chunks])
+            else:
+                covs = None
             
             # Sync multi-GPU
             for dev in devices:
                 if dev.type == 'cuda':
                     torch.cuda.synchronize(dev)
         else:
-            costs = run_batch_pytorch(genes, device)
+            costs, covs = run_batch_pytorch(genes, device)
             # Sync single-GPU
             if device.type == 'cuda':
                 torch.cuda.synchronize(device)
@@ -150,12 +163,13 @@ def optimize_pytorch(devices):
         sorted_idx = torch.argsort(costs)
         best_idx = sorted_idx[0]
         best_cost = costs[best_idx].item()
+        best_cov_val = covs[best_idx].item() * 100 if covs is not None else 0.0
         
         if best_cost < global_best_cost:
             global_best_cost = best_cost
             global_best_params = {k: genes[k][best_idx].clone() for k in genes}
             
-        print(f"Gen {gen:02d} | Cost: {global_best_cost:.2f} | T: {dt:.2f}s")
+        print(f"Gen {gen:02d} | Cost: {global_best_cost:.2f} | T: {dt:.2f}s | Best exploration rate : {best_cov_val:.1f}%")
         
         # Log
         current_best = SwarmParams(**{k: v.item() for k, v in global_best_params.items()})
@@ -222,6 +236,7 @@ def generate_final_data_pytorch(params, logger, device):
         vz = vz[0:1]
     
     history_pos, history_phi, history_v, history_vz = [], [], [], []
+    history_cov = []
     
     grid = None
     if config.SCENARIO == "exploration":
@@ -251,18 +266,21 @@ def generate_final_data_pytorch(params, logger, device):
             
             if t % getattr(config, 'REFRESH_MAP_TICKS', 50) == 0:
                 grid.share_maps(pos, getattr(config, 'NEIGHBORS', 2))
+                
+            # Snapshot of the map on each frame
+            if grid.strategy == "global":
+                explored = (grid.spoilage[0] < grid.MAX_SPOIL * 0.9).float()
+            else:
+                global_spoilage, _ = torch.min(grid.spoilage[0], dim=0)
+                explored = (global_spoilage < grid.MAX_SPOIL * 0.9).float()
+            history_cov.append(explored.cpu().numpy())
             
     # Host transfer
     final_cov = None
     if grid:
-        score = grid.get_score().item()
+        score = grid.get_coverage().item()
         print(f"[PyTorch] Final Exploration Coverage: {score * 100:.2f}%")
-        
-        if grid.spoilage.dim() == 4:
-            merged_spoilage, _ = torch.min(grid.spoilage[0], dim=0)
-            final_cov = (1.0 - (merged_spoilage / grid.MAX_SPOIL)).cpu().numpy()
-        else:
-            final_cov = (1.0 - (grid.spoilage[0] / grid.MAX_SPOIL)).cpu().numpy()
+        final_cov = np.stack(history_cov) # Temporal tensor of the map
         
     full_pos = torch.stack(history_pos).squeeze(1).cpu().numpy()
     full_phi = torch.stack(history_phi).squeeze(1).cpu().numpy()

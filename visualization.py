@@ -166,8 +166,8 @@ def generate_gif_from_log(log_path):
         X, Y = None, None
         
         if coverage is not None: 
-            x_grid = np.linspace(-ARENA_RADIUS, ARENA_RADIUS, coverage.shape[0])
-            y_grid = np.linspace(-ARENA_RADIUS, ARENA_RADIUS, coverage.shape[1])
+            x_grid = np.linspace(-ARENA_RADIUS, ARENA_RADIUS, coverage.shape[1])
+            y_grid = np.linspace(-ARENA_RADIUS, ARENA_RADIUS, coverage.shape[2])
             X, Y = np.meshgrid(x_grid, y_grid)
         
         def update_3d(frame):
@@ -186,16 +186,15 @@ def generate_gif_from_log(log_path):
                 ax.set_xlim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
                 ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
                 ax.set_zlim(0, 10)
-                # Draw arena boundary
-                ax.plot(ARENA_RADIUS * np.cos(theta_circle), ARENA_RADIUS * np.sin(theta_circle), 0, color='r', ls='--', alpha=0.5)
+                
             ax.set_title(title)
             
             # Draw arena boundary
             ax.plot(ARENA_RADIUS * np.cos(theta_circle), ARENA_RADIUS * np.sin(theta_circle), 0, color='r', ls='--', alpha=0.5)
             
-            # Draw final coverage on ground plane
+            # Draw dynamic coverage on ground plane
             if coverage is not None:
-                ax.contourf(X, Y, coverage.T, zdir='z', offset=0, cmap='YlGn', alpha=0.3)
+                ax.contourf(X, Y, coverage[frame].T, zdir='z', offset=0, cmap='YlGn', alpha=0.3, levels=[0.5, 1.0])
             
             px = pos[frame, :, 0]
             py = pos[frame, :, 1]
@@ -213,17 +212,17 @@ def generate_gif_from_log(log_path):
     else:
         ax = fig.add_subplot(111)
         if getattr(config, "FULL_MILLING_MODE", False):
-            ax.autoscale(False) # Les limites seront gérées dans update()
+            ax.autoscale(False)
         else:
             ax.set_xlim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
             ax.set_ylim(-ARENA_RADIUS-1, ARENA_RADIUS+1)
             ax.add_patch(Circle((0, 0), ARENA_RADIUS, color='r', fill=False, ls='--', alpha=0.5))
             
         # Plot coverage background
+        cov_img = None
         if coverage is not None:
-            # Use tuple for extent to satisfy Pylance/Matplotlib
             extent = (-ARENA_RADIUS, ARENA_RADIUS, -ARENA_RADIUS, ARENA_RADIUS)
-            ax.imshow(coverage.T, extent=extent, origin='lower', cmap='YlGn', alpha=0.3, zorder=0)
+            cov_img = ax.imshow(coverage[0].T, extent=extent, origin='lower', cmap='YlGn', alpha=0.3, zorder=0, vmin=0, vmax=1)
         
         ax.set_title(title)
         ax.set_aspect('equal')
@@ -237,6 +236,9 @@ def generate_gif_from_log(log_path):
             quiver.set_offsets(pos[frame])
             quiver.set_UVC(np.cos(phi[frame]), np.sin(phi[frame]))
             
+            if cov_img is not None:
+                cov_img.set_data(coverage[frame].T)
+            
             if getattr(config, "FULL_MILLING_MODE", False):
                 barycenter = np.mean(pos[frame], axis=0)
                 max_dist = np.max(np.linalg.norm(pos[frame] - barycenter, axis=-1))
@@ -244,7 +246,7 @@ def generate_gif_from_log(log_path):
                 ax.set_xlim(barycenter[0] - margin, barycenter[0] + margin)
                 ax.set_ylim(barycenter[1] - margin, barycenter[1] + margin)
             
-            return quiver,
+            return (quiver, cov_img) if cov_img is not None else (quiver,)
 
         ani = FuncAnimation(fig, update, frames=len(pos), interval=30, blit=True)
     

@@ -6,7 +6,7 @@ Z_MIN = 1.0
 Z_MAX = 10.0 
 DT = 0.1             # ADVICE : for 3D simulations, use less than 0.1   
 ARENA_RADIUS = 100.0
-NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 15))         
+NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 5))         
 MAX_SPEED = 20.0     
                     # NEIGHBORS = None for no limit (bypasses partition for better performance)
 NEIGHBORS = 2       # Number of closest neighbors taken into account for interactions
@@ -27,8 +27,8 @@ SPOIL_ADD = 0.05
 POP_SIZE_CPU = 150        
 GEN_CPU = 20              
 
-POP_SIZE_GPU = 5000   # PyTorch uses this one   
-GEN_GPU = 20             
+POP_SIZE_GPU = 250   # PyTorch uses this one   
+GEN_GPU = 10             
 
 SIM_STEPS = 500         
 VISU_STEPS = 1000      
@@ -39,7 +39,7 @@ MIN_SPAWN_DIST = 2.0      # Distance minimale entre les drones à l'apparition
 
 # Distributed Memory & Exploration
 MAP_STRATEGY = os.getenv('MAP_STRATEGY_OVERRIDE', "local_shared")       # "global" | "local_individual" | "local_shared"
-EXPLO_STRATEGY = os.getenv('EXPLO_STRATEGY_OVERRIDE', "local_gradient")  # "local_gradient" | "global_closest"
+EXPLO_STRATEGY = os.getenv('EXPLO_STRATEGY_OVERRIDE', "global_best")  # "local_gradient" | "global_best"
 REFRESH_MAP_TICKS = 50              # Fréquence de partage (en nombre de dt)
 FOV_FACTOR = 0.9                    # Tangente du demi-angle du cône de vision (1.0 = angle de 45°)
 

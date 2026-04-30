@@ -213,19 +213,24 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
     vz_dot_explo = 0.0
     
     if grid is not None and getattr(config, 'SCENARIO', 'default') == 'exploration':
-        grad_x, grad_y = grid.get_gradient(pos)
+        explo_strat = getattr(config, 'EXPLO_STRATEGY', 'local_gradient')
         
-        # Angle vers la direction la plus inexplorée
-        target_angle = torch.atan2(grad_y, grad_x)
-        angle_diff = (target_angle - phi + math.pi) % (2 * math.pi) - math.pi
-        
-        # Force activée proportionnellement à l'urgence d'explorer (magnitude du gradient)
-        grad_mag = torch.sqrt(grad_x**2 + grad_y**2)
-        explo_activation = torch.clamp(grad_mag / (grid.MAX_SPOIL * 0.1), 0.0, 1.0)
-        
+        if explo_strat == 'local_gradient':
+            grad_x, grad_y = grid.get_gradient(pos)
+            # Angle vers la direction la plus inexplorée
+            target_angle = torch.atan2(grad_y, grad_x)
+            angle_diff = (target_angle - phi + math.pi) % (2 * math.pi) - math.pi
+            
+            grad_mag = torch.sqrt(grad_x**2 + grad_y**2)
+            explo_activation = torch.clamp(grad_mag / (grid.MAX_SPOIL * 0.1), 0.0, 1.0)
+            
+        elif explo_strat == 'global_best':
+            target_angle, explo_activation = grid.get_global_best_direction(pos)
+            angle_diff = (target_angle - phi + math.pi) % (2 * math.pi) - math.pi
+            
         phi_dot_explo = y_explo * angle_diff * explo_activation
         
-        # Optionnel : si Z est activé, plonger légèrement vers le sol (-Z) pour utiliser la puissance max du FOV
+        # si Z est activé, plonger légèrement vers le sol (-Z) pour utiliser la puissance max du FOV
         if config.ENABLE_3D and vz is not None:
             vz_dot_explo = - y_explo * explo_activation * 0.5
 
@@ -364,9 +369,15 @@ class TensorExplorationGrid:
         xs = torch.linspace(-self.radius + res/2, self.radius - res/2, self.size, device=self.device)
         ys = torch.linspace(-self.radius + res/2, self.radius - res/2, self.size, device=self.device)
         grid_x, grid_y = torch.meshgrid(xs, ys, indexing='ij')
+        
         # Format [1, 1, X, Y] for partial broadcasting (VRAM Optimization)
         self.grid_x = grid_x.view(1, 1, self.size, self.size)
         self.grid_y = grid_y.view(1, 1, self.size, self.size)
+
+        # Masking the circular arena
+        dist_from_center_sq = self.grid_x**2 + self.grid_y**2
+        self.valid_mask = (dist_from_center_sq <= self.radius**2).squeeze(0).squeeze(0)
+        self.valid_blocks_count = torch.sum(self.valid_mask).float() # Number of explorable spots
 
     @torch.no_grad()
     def update(self, pos):
@@ -435,15 +446,22 @@ class TensorExplorationGrid:
                 
         self.spoilage.copy_(new_spoilage)
 
+    
     @torch.no_grad()
-    def get_score(self):
+    @torch.no_grad()
+    def get_coverage(self):
         if self.strategy == "global":
-            freshness = 1.0 - (self.spoilage / self.MAX_SPOIL) # freshness 1.0 = fully fresh
-            return torch.mean(freshness, dim=(1, 2))
+            explored = (self.spoilage < self.MAX_SPOIL * 0.9).float() * self.valid_mask # valid_mask verifies if the spot is in the circle
+            return torch.sum(explored, dim=(1, 2)) / self.valid_blocks_count
         else:
             global_spoilage, _ = torch.min(self.spoilage, dim=1)
-            freshness = 1.0 - (global_spoilage / self.MAX_SPOIL)
-            return torch.mean(freshness, dim=(1, 2))
+            explored = (global_spoilage < self.MAX_SPOIL * 0.9).float() * self.valid_mask
+            return torch.sum(explored, dim=(1, 2)) / self.valid_blocks_count
+
+
+    @torch.no_grad()
+    def get_score(self):
+        return self.get_coverage()
         
         
     @torch.no_grad()
@@ -482,3 +500,45 @@ class TensorExplorationGrid:
         grad_y = spoil_y_p - spoil_y_m
         
         return grad_x, grad_y
+
+    @torch.no_grad()
+    def get_global_best_direction(self, pos):
+        """ Implémentation absolue cherchant la cible inexplorée la plus proche (dans l'arène). """
+        batch_size = pos.shape[0]
+        n_drones = pos.shape[1]
+        
+        if self.strategy == "global":
+            current_spoilage = self.spoilage.unsqueeze(1).expand(-1, n_drones, -1, -1)
+        else:
+            current_spoilage = self.spoilage
+            
+        # Needs to be unexplored and in the arena
+        unexplored_mask = (current_spoilage > self.MAX_SPOIL * 0.9) & self.valid_mask
+        
+        # Drone coordinates
+        px = pos[..., 0].unsqueeze(-1).unsqueeze(-1)
+        py = pos[..., 1].unsqueeze(-1).unsqueeze(-1)
+        
+        dist_sq = (self.grid_x - px)**2 + (self.grid_y - py)**2
+        dist_sq.add_(torch.sub(self.grid_y, py).pow_(2))
+        
+        # Ignoring explored spots AND spots outside the arena
+        dist_sq_masked = torch.where(unexplored_mask, dist_sq, torch.tensor(float('inf'), device=self.device))
+        
+        # Searching for minimum
+        dist_sq_flat = dist_sq_masked.view(batch_size, n_drones, -1)
+        min_dist, min_idx = torch.min(dist_sq_flat, dim=-1)
+        
+        target_idx_x = min_idx // self.size
+        target_idx_y = min_idx % self.size
+        
+        xs = torch.linspace(-self.radius + self.res/2, self.radius - self.res/2, self.size, device=self.device)
+        ys = torch.linspace(-self.radius + self.res/2, self.radius - self.res/2, self.size, device=self.device)
+        
+        target_x = xs[target_idx_x]
+        target_y = ys[target_idx_y]
+        
+        target_angle = torch.atan2(target_y - pos[..., 1], target_x - pos[..., 0])
+        explo_activation = torch.isfinite(min_dist).float() 
+        
+        return target_angle, explo_activation

@@ -45,9 +45,15 @@ def run_batch_pytorch(genes, device):
     if config.SCENARIO == "exploration":
         grid = TensorExplorationGrid(total_envs, NB_DRONES, config.ARENA_RADIUS, config.GRID_RES, device=device)
     
+    eye_mask_batch = torch.eye(NB_DRONES, dtype=torch.bool, device=device).expand(total_envs, NB_DRONES, NB_DRONES)
+    noise_buffer = torch.empty_like(phi)
+    
     # Integration loop
     for t in range(SIM_STEPS):
-        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, grid=grid)
+        acc, phi_dot, vz_dot = compute_derivatives(
+            pos, phi, v, params, vz=vz, grid=grid, 
+            eye_mask=eye_mask_batch, noise_buffer=noise_buffer
+        )
         
         v += acc * DT
         phi += phi_dot * DT
@@ -66,7 +72,8 @@ def run_batch_pytorch(genes, device):
         
         # Post-transient metrics
         if t > 50:
-            c_disp, c_effort, c_coll, c_pol, c_mill = compute_metrics(pos, phi, phi_dot, v)
+            c_disp, c_effort, c_coll, c_pol, c_mill = compute_metrics(
+                pos, phi, phi_dot, v, eye_mask = eye_mask_batch )
             cost_total += c_disp + c_effort + c_coll + c_pol + c_mill
 
             if grid:
@@ -142,7 +149,7 @@ def optimize_pytorch(devices):
                 
             costs = torch.cat([c.to(device) for c in costs_chunks])
             if covs_chunks[0] is not None:
-                covs = torch.cat([c.to(device) for c in covs_chunks])
+                covs = torch.cat([c.to(device) for c in covs_chunks if c is not None])
             else:
                 covs = None
             
@@ -243,6 +250,9 @@ def generate_final_data_pytorch(params, logger, device):
     if config.SCENARIO == "exploration":
         grid = TensorExplorationGrid(1, NB_DRONES, config.ARENA_RADIUS, config.GRID_RES, device=device)
     
+    eye_mask_single = torch.eye(NB_DRONES, dtype=torch.bool, device=device).expand(1, NB_DRONES, NB_DRONES)
+    noise_buffer = torch.empty_like(phi)
+    
     # Visu loop
     for t in range(VISU_STEPS): 
         history_pos.append(pos.clone())
@@ -251,7 +261,10 @@ def generate_final_data_pytorch(params, logger, device):
         if vz is not None:
             history_vz.append(vz.clone())
 
-        acc, phi_dot, vz_dot = compute_derivatives(pos, phi, v, params, vz=vz, grid=grid)
+        acc, phi_dot, vz_dot = compute_derivatives(
+            pos, phi, v, params, vz=vz, grid=grid,
+            eye_mask=eye_mask_single, noise_buffer=noise_buffer
+        )
         
         v += acc * DT
         phi += phi_dot * DT

@@ -7,31 +7,31 @@ Z_MAX = 10.0
 DT = 0.1             # ADVICE : for 3D simulations, use less than 0.1   
 ARENA_RADIUS = 120.0
 NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 10))         
-MAX_SPEED = 20.0     
+MAX_SPEED = 30.0     
                     # NEIGHBORS = None for no limit (bypasses partition for better performance)
 NEIGHBORS = 2       # Number of closest neighbors taken into account for interactions
 COLLISION_DIST = 0.4
 SCENARIO = "exploration"  # "default" | "exploration"
 FULL_MILLING_MODE = False # Enables the no-arena milling scenario
-GRID_RES = 5.0        # Spatial resolution (m)
+GRID_RES = 10.0        # Spatial resolution (m)
 
 # Dynamics Control
 ALPHA_LPF = 0.2          # Low-pass filter gain for yaw rate
 MAX_YAW_RATE = 3.14      # Max rotational speed (rad/s)
 
 # Exploration
-SPOIL_MULT = 1.01
-SPOIL_ADD = 0.05
+SPOIL_MULT = 1.002
+SPOIL_ADD = 0.02
 
 # Optimization
 POP_SIZE_CPU = 150        
 GEN_CPU = 20              
 
-POP_SIZE_GPU = 1000   # PyTorch uses this one   
-GEN_GPU = 10             
+POP_SIZE_GPU = 500   # PyTorch uses this one   
+GEN_GPU = 15             
 
-SIM_STEPS = 500         
-VISU_STEPS = 1000      
+SIM_STEPS = 5000         
+VISU_STEPS = 5000      
 
 # Initial Conditions & Robustness
 N_INIT_CONDITIONS = 4     # Nombre de situations initiales différentes
@@ -40,7 +40,7 @@ MIN_SPAWN_DIST = 2.0      # Distance minimale entre les drones à l'apparition
 # Distributed Memory & Exploration
 MAP_STRATEGY = os.getenv('MAP_STRATEGY_OVERRIDE', "local_shared")       # "global" | "local_individual" | "local_shared"
 EXPLO_STRATEGY = os.getenv('EXPLO_STRATEGY_OVERRIDE', "global_best")  # "local_gradient" | "global_best"
-REFRESH_MAP_TICKS = 50              # Fréquence de partage (en nombre de dt)
+REFRESH_MAP_TICKS = 100             # Fréquence de partage (en nombre de dt)
 FOV_FACTOR = 0.9                    # Tangente du demi-angle du cône de vision (1.0 = angle de 45°)
 
 # Cost Function Weights

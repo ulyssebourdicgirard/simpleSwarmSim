@@ -86,7 +86,7 @@ def get_deterministic_initial_state(n_batch, n_drones, device=torch.device("cpu"
     
     
 @torch.no_grad()
-def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
+def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None, eye_mask=None, noise_buffer=None):
     device = pos.device
     
     # Unpack
@@ -135,9 +135,10 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
         d_ij = torch.linalg.norm(r_ij, dim=-1)
     
     # Mask self
-    eye_mask = torch.eye(d_ij.shape[-1], dtype=torch.bool, device=device)
-    if len(d_ij.shape) > 2: 
-        eye_mask = eye_mask.expand(d_ij.shape)
+    if eye_mask is None:
+        eye_mask = torch.eye(d_ij.shape[-1], dtype=torch.bool, device=device)
+        if len(d_ij.shape) > 2: 
+            eye_mask = eye_mask.expand(d_ij.shape)
     d_ij = torch.clamp(d_ij, min=0.01)
 
     # Angles
@@ -215,6 +216,9 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
     if grid is not None and getattr(config, 'SCENARIO', 'default') == 'exploration':
         explo_strat = getattr(config, 'EXPLO_STRATEGY', 'local_gradient')
         
+        angle_diff = 0.0
+        explo_activation = 0.0
+        
         if explo_strat == 'local_gradient':
             grad_x, grad_y = grid.get_gradient(pos)
             # Angle vers la direction la plus inexplorée
@@ -235,7 +239,10 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
             vz_dot_explo = - y_explo * explo_activation * 0.5
 
     # Noise addition
-    noise = torch.empty_like(phi).uniform_(-0.1, 0.1)
+    if noise_buffer is None:
+        noise = torch.empty_like(phi).uniform_(-0.1, 0.1)
+    else:
+        noise = noise_buffer.uniform_(-0.1, 0.1)
     
     phi_dot_social = torch.clamp(social_sum + phi_dot_explo + noise, -3.0, 3.0)
     phi_dot_vital = torch.clamp(rep_sum + w_force, -10.0, 10.0)
@@ -278,7 +285,7 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None):
 
 
 @torch.no_grad()
-def compute_metrics(pos, phi, phi_dot, v):
+def compute_metrics(pos, phi, phi_dot, v, eye_mask=None):
     """
     Centralized Cost Function Logic.
     Handles both CPU (N, 2) and GPU (Batch, N, 2) arrays.
@@ -313,12 +320,14 @@ def compute_metrics(pos, phi, phi_dot, v):
     d_ij = torch.linalg.norm(r_ij, dim=-1)
     
     # Mask diagonal (self-distance)
-    eye = torch.eye(pos.shape[dim_agent], dtype=torch.bool, device=device)
-    if is_batch:
-        eye = eye.expand(d_ij.shape)
+    if eye_mask is None:
+        eye_mask = torch.eye(pos.shape[dim_agent], dtype=torch.bool, device=device)
+        if is_batch:
+            eye_mask = eye_mask.expand(d_ij.shape)
+            
     
     # Set self-distance to infinity to avoid counting it
-    d_ij = torch.where(eye, torch.tensor(float('inf'), device=device), d_ij)
+    d_ij = torch.where(eye_mask, torch.tensor(float('inf'), device=device), d_ij)
     
     # Count collisions (symmetric matrix, so divide count by 2)
     sum_dims = (1, 2) if is_batch else (0, 1)

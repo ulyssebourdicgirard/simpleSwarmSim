@@ -43,7 +43,7 @@ class SwarmParams:
 def get_deterministic_initial_state(n_batch, n_drones, device=torch.device("cpu")):
     total_envs = n_batch * getattr(config, 'N_INIT_CONDITIONS', 4)
     
-    radius = ARENA_RADIUS * 0.8
+    radius = 5 ##ARENA_RADIUS * 0.8
     theta = torch.empty((total_envs, n_drones), device=device, dtype=torch.float32).uniform_(0, 2.0 * math.pi)
     
     u = torch.rand((total_envs, n_drones), device=device, dtype=torch.float32)
@@ -349,7 +349,6 @@ def compute_metrics(pos, phi, phi_dot, v, eye_mask=None):
     c_mill = mill * W_MILL
     
     return c_disp, c_effort, c_coll, c_pol, c_mill
-
 
 class TensorExplorationGrid:
     def __init__(self, batch_size, n_drones, arena_radius=50.0, res=5.0, device=torch.device("cpu")):

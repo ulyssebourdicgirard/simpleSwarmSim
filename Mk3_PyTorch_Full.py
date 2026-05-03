@@ -9,21 +9,6 @@ from dynamics_pytorch import SwarmParams, TensorExplorationGrid, compute_derivat
 from logger import ExperimentLogger
 from visualization import generate_gif_from_log
 
-# Hardware routing
-devices = []
-if torch.cuda.is_available():
-    n_gpus = torch.cuda.device_count()
-    print(f"[Hardware] Found {n_gpus} CUDA device(s).")
-    devices = [torch.device(f"cuda:{i}") for i in range(n_gpus)]
-elif torch.backends.mps.is_available():
-    print("[Hardware] Using Apple MPS.")
-    devices = [torch.device("mps")]
-else:
-    print("[Hardware] Using CPU.")
-    devices = [torch.device("cpu")]
-    
-primary_device = devices[0]
-
 def run_batch_pytorch(genes, device):
     # Frozen noise
     torch.manual_seed(42)
@@ -32,7 +17,12 @@ def run_batch_pytorch(genes, device):
     n_envs = getattr(config, 'N_INIT_CONDITIONS', 4)
     total_envs = n_batch * n_envs
     
-    pos, phi, v, vz = get_deterministic_initial_state(n_batch, NB_DRONES, device=device)
+    base_pos, base_phi, base_v, base_vz = get_deterministic_initial_state(1, NB_DRONES, device=device)
+    
+    pos = base_pos.repeat(n_batch, 1, 1)
+    phi = base_phi.repeat(n_batch, 1)
+    v = base_v.repeat(n_batch, 1)
+    vz = base_vz.repeat(n_batch, 1) if base_vz is not None else None
     
     expanded_genes = {}
     for k, val in genes.items():
@@ -56,6 +46,7 @@ def run_batch_pytorch(genes, device):
         )
         
         v += acc * DT
+        v = torch.clamp(v, 0.0, config.MAX_SPEED)
         phi += phi_dot * DT
         pos[..., 0] += v * torch.cos(phi) * DT
         pos[..., 1] += v * torch.sin(phi) * DT
@@ -267,6 +258,7 @@ def generate_final_data_pytorch(params, logger, device):
         )
         
         v += acc * DT
+        v = torch.clamp(v, 0.0, config.MAX_SPEED)
         phi += phi_dot * DT
         pos[..., 0] += v * torch.cos(phi) * DT
         pos[..., 1] += v * torch.sin(phi) * DT
@@ -305,6 +297,22 @@ def generate_final_data_pytorch(params, logger, device):
     logger.save_trajectory(full_pos, full_phi, full_v, params, vz=full_vz, coverage=final_cov)
 
 if __name__ == "__main__":
+    # Hardware routing shielded from multiprocessing spawn
+    devices = []
+    if torch.cuda.is_available():
+        n_gpus = torch.cuda.device_count()
+        print(f"[Hardware] Found {n_gpus} CUDA device(s).")
+        devices = [torch.device(f"cuda:{i}") for i in range(n_gpus)]
+    elif torch.backends.mps.is_available():
+        print("[Hardware] Using Apple MPS.")
+        devices = [torch.device("mps")]
+    else:
+        print("[Hardware] Using CPU.")
+        devices = [torch.device("cpu")]
+        
+    primary_device = devices[0]
+
+    # Main sequence run
     best_p, logger = optimize_pytorch(devices)
     generate_final_data_pytorch(best_p, logger, primary_device)
     generate_gif_from_log(logger.log_dir)

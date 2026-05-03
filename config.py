@@ -1,18 +1,18 @@
 import os
 
 # Env / Physics
-ENABLE_3D = True    # True: 3D, False: 2D
+ENABLE_3D = False    # True: 3D, False: 2D
 Z_MIN = 1.0     
 Z_MAX = 10.0 
 DT = 0.1             # ADVICE : for 3D simulations, use less than 0.1   
-ARENA_RADIUS = 120.0
+ARENA_RADIUS = 50.0
 NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 10))         
 MAX_SPEED = 30.0     
                     # NEIGHBORS = None for no limit (bypasses partition for better performance)
-NEIGHBORS = 2       # Number of closest neighbors taken into account for interactions
+NEIGHBORS = 4       # Number of closest neighbors taken into account for interactions
 COLLISION_DIST = 0.4
 SCENARIO = "exploration"  # "default" | "exploration"
-FULL_MILLING_MODE = False # Enables the no-arena milling scenario
+FULL_MILLING_MODE = True # Enables the no-arena milling scenario
 GRID_RES = 5.0        # Spatial resolution (m)
 
 # Dynamics Control
@@ -27,11 +27,11 @@ SPOIL_ADD = 0.02
 POP_SIZE_CPU = 150        
 GEN_CPU = 20              
 
-POP_SIZE_GPU = 500   # PyTorch uses this one   
-GEN_GPU = 15             
+POP_SIZE_GPU = 5000   # PyTorch uses this one   
+GEN_GPU = 20             
 
-SIM_STEPS = 5000         
-VISU_STEPS = 5000      
+SIM_STEPS = 800         
+VISU_STEPS = 2000      
 
 # Initial Conditions & Robustness
 N_INIT_CONDITIONS = 4     # Nombre de situations initiales différentes
@@ -46,14 +46,14 @@ FOV_FACTOR = 0.9                    # Tangente du demi-angle du cône de vision 
 # Cost Function Weights
 if FULL_MILLING_MODE:
     SCENARIO = "default" # No grid exploration
-    W_EFFORT = 1.0       # To avoid shaking
-    W_DISP = 0.0         
+    W_EFFORT = 0.5       
+    W_DISP = 2.0        # You have to penalize splitting or they will use the tangeantial exploit
     W_POL = 0.0          # No reward for flying in a straight line
-    W_COLL = 0       
-    W_MILL = -100.0      # NEGATIVE VALUE to reward milling
+    W_COLL = 10.0       
+    W_MILL = -300.0      # NEGATIVE VALUE to reward milling
     W_EXPLO = 0.0
 else:
-    W_EFFORT = 1.0  
+    W_EFFORT = 1.0  # To avoid shaking
     W_DISP = 0.0
     W_POL = -0.0
     W_COLL = 500.0

@@ -13,7 +13,7 @@ NEIGHBORS = 2       # Number of closest neighbors taken into account for interac
 COLLISION_DIST = 0.4
 SCENARIO = "exploration"  # "default" | "exploration"
 FULL_MILLING_MODE = False # Enables the no-arena milling scenario
-GRID_RES = 10.0        # Spatial resolution (m)
+GRID_RES = 5.0        # Spatial resolution (m)
 
 # Dynamics Control
 ALPHA_LPF = 0.2          # Low-pass filter gain for yaw rate

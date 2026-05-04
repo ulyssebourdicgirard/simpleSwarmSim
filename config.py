@@ -7,9 +7,9 @@ Z_MAX = 10.0
 DT = 0.1             # ADVICE : for 3D simulations, use less than 0.1   
 ARENA_RADIUS = 50.0
 NB_DRONES = int(os.getenv('NB_DRONES_OVERRIDE', 10))         
-MAX_SPEED = 30.0     
+MAX_SPEED = 20.0     
                     # NEIGHBORS = None for no limit (bypasses partition for better performance)
-NEIGHBORS = 4       # Number of closest neighbors taken into account for interactions
+NEIGHBORS = 2       # Number of closest neighbors taken into account for interactions
 COLLISION_DIST = 0.4
 SCENARIO = "exploration"  # "default" | "exploration"
 FULL_MILLING_MODE = True # Enables the no-arena milling scenario
@@ -30,8 +30,8 @@ GEN_CPU = 20
 POP_SIZE_GPU = 5000   # PyTorch uses this one   
 GEN_GPU = 20             
 
-SIM_STEPS = 800         
-VISU_STEPS = 2000      
+SIM_STEPS = 3000         
+VISU_STEPS = 6000      
 
 # Initial Conditions & Robustness
 N_INIT_CONDITIONS = 4     # Nombre de situations initiales différentes

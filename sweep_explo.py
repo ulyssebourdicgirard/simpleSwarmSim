@@ -1,6 +1,6 @@
 import os
 import subprocess
-import sys 
+import sys
 import datetime
 
 # Configurations to test
@@ -20,9 +20,8 @@ with open(log_file, 'w') as out_file, open(error_file, 'w') as err_file:
         for e_strat in explo_strategy:
             os.environ['MAP_STRATEGY_OVERRIDE'] = m_strat
             os.environ['EXPLO_STRATEGY_OVERRIDE'] = e_strat
-            
-            print(f"\n>>> Stratégie de partage de la carte: {m_strat}", file=out_file)
-            print(f"\n>>> Stratégie d'exploration: {e_strat}", file=out_file)
+
+            print(f"\n>>> Stratégie de partage de la carte: {m_strat}, d'exploration: {e_strat}", file=out_file, flush=True)
 
             try:
                 subprocess.run(

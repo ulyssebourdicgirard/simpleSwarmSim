@@ -48,12 +48,12 @@ FOV_FACTOR = 0.9                    # Tangente du demi-angle du cône de vision 
 if FULL_MILLING_MODE:
     SCENARIO = "default" # No grid exploration
     W_EFFORT = 0       
-    W_DISP = 10.0        # You have to penalize splitting or they will use the tangeantial exploit
+    W_DISP = 10.0        
     W_POL = 250.0          # No reward for flying in a straight line
     W_COLL = 50.0       
     W_MILL = -600.0      # NEGATIVE VALUE to reward milling
     W_EXPLO = 0.0
-    W_STATIONARY = 50 # To keep the barycenter from moving for exploits
+    W_STATIONARY = 50       # To keep the barycenter from moving for exploits, POSITIVE -> rewards being stationary
 else:
     W_EFFORT = 1.0  # To avoid shaking
     W_DISP = 0.0

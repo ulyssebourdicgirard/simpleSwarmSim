@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import torch
 import math
 import config
-from config import DT, ARENA_RADIUS, W_EFFORT, W_DISP, W_POL, W_COLL, W_MILL, NEIGHBORS, COLLISION_DIST, Z_MIN, Z_MAX
+from config import DT, ARENA_RADIUS, W_EFFORT, W_DISP, W_POL, W_COLL, W_MILL, W_STATIONARY, NEIGHBORS, COLLISION_DIST, Z_MIN, Z_MAX
 
 @dataclass
 class SwarmParams:
@@ -242,7 +242,7 @@ def compute_derivatives(pos, phi, v, p, vz=None, phi_dot_mem=None, grid=None, ey
     if noise_buffer is None:
         noise = torch.empty_like(phi).uniform_(-0.1, 0.1)
     else:
-        noise = noise_buffer.uniform_(-0.1, 0.1)
+        noise = noise_buffer
     
     phi_dot_social = torch.clamp(social_sum + phi_dot_explo + noise, -3.0, 3.0)
     phi_dot_vital = torch.clamp(rep_sum + w_force, -10.0, 10.0)
@@ -348,7 +348,15 @@ def compute_metrics(pos, phi, phi_dot, v, eye_mask=None):
     mill = torch.abs(torch.mean(torch.sin(theta - phi_vel), dim=dim_agent))
     c_mill = mill * W_MILL
     
-    return c_disp, c_effort, c_coll, c_pol, c_mill
+    # Barycenter Speed
+    v_bary_vec = torch.mean(vel, dim=dim_agent) 
+    v_bary_norm = torch.linalg.norm(v_bary_vec, dim=-1)
+
+    # Barycenter immobility weight
+    W_STATIONARY = getattr(config, 'W_STATIONARY', 100.0)
+    c_stationary = v_bary_norm * W_STATIONARY
+
+    return c_disp, c_effort, c_coll, c_pol, c_mill, c_stationary
 
 class TensorExplorationGrid:
     def __init__(self, batch_size, n_drones, arena_radius=50.0, res=5.0, device=torch.device("cpu")):

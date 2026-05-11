@@ -36,10 +36,13 @@ def run_batch_pytorch(genes, device):
         grid = TensorExplorationGrid(total_envs, NB_DRONES, config.ARENA_RADIUS, config.GRID_RES, device=device)
     
     eye_mask_batch = torch.eye(NB_DRONES, dtype=torch.bool, device=device).expand(total_envs, NB_DRONES, NB_DRONES)
-    noise_buffer = torch.empty_like(phi)
+    shared_noise = torch.empty((n_envs, NB_DRONES), device=device)    
     
     # Integration loop
     for t in range(SIM_STEPS):
+        shared_noise.uniform_(-0.1, 0.1)
+        noise_buffer = shared_noise.repeat(n_batch, 1)
+        
         acc, phi_dot, vz_dot = compute_derivatives(
             pos, phi, v, params, vz=vz, grid=grid, 
             eye_mask=eye_mask_batch, noise_buffer=noise_buffer
@@ -63,17 +66,24 @@ def run_batch_pytorch(genes, device):
         
         # Post-transient metrics
         if t > 50:
-            c_disp, c_effort, c_coll, c_pol, c_mill = compute_metrics(
-                pos, phi, phi_dot, v, eye_mask = eye_mask_batch )
-            cost_total += c_disp + c_effort + c_coll + c_pol + c_mill
+            c_disp, c_effort, c_coll, c_pol, c_mill, c_stat = compute_metrics(
+                pos, phi, phi_dot, v, eye_mask = eye_mask_batch)
+            cost_total += c_disp + c_effort + c_coll + c_pol + c_mill + c_stat
 
             if grid:
                 cost_total += grid.get_score() * config.W_EXPLO
 
-    # --- MIN-MAX ---
+    # Evaluation conditions initiales
     cost_total = cost_total.view(n_batch, n_envs)
     
-    worst_costs, _ = torch.max(cost_total, dim=1) # keeping the worst costs to favor robustness
+    eval_strategy = getattr(config, 'EVAL_STRATEGY', 'minmax')
+    
+    if eval_strategy == "average":
+        eval_costs = torch.mean(cost_total, dim=1)
+    elif eval_strategy == "best":
+        eval_costs, _ = torch.min(cost_total, dim=1)
+    else:
+        eval_costs, _ = torch.max(cost_total, dim=1)
 
     final_covs = None
     if grid:
@@ -81,7 +91,7 @@ def run_batch_pytorch(genes, device):
         covs = covs.view(n_batch, n_envs)
         final_covs = torch.mean(covs, dim=1) # Average genome coverage
         
-    return worst_costs, final_covs
+    return eval_costs, final_covs, cost_total
 
 
 
@@ -149,8 +159,8 @@ def optimize_pytorch(devices):
                 if dev.type == 'cuda':
                     torch.cuda.synchronize(dev)
         else:
-            costs, covs = run_batch_pytorch(genes, device)
             # Sync single-GPU
+            costs, covs, _ = run_batch_pytorch(genes, device)
             if device.type == 'cuda':
                 torch.cuda.synchronize(device)
             elif device.type == 'mps':
@@ -192,20 +202,24 @@ def optimize_pytorch(devices):
             
             for k in genes:
                 # Genes excluded from training
-                if k in ['a_att', 'b1_att', 'b2_att', 'd0_ali', 'a_ali', 'b1_ali', 'b2_ali']: continue
-                
+                if k in ['a_att', 'b1_att', 'b2_att', 'a_ali', 'b1_ali', 'b2_ali']: continue
+                                
                 crossover_mask = torch.rand((POP_SIZE_GPU - 1, 1), device=device) < 0.5
                 children_genes = torch.where(crossover_mask, genes[k][parent1_idx], genes[k][parent2_idx])
                 
-                # Noise mask
-                mask = torch.rand(children_genes.shape, device=device) < mutation_rate
+                # Local mutation
+                mask_local = torch.rand(children_genes.shape, device=device) < mutation_rate
                 noise = torch.normal(mean=1.0, std=0.3, size=children_genes.shape, device=device)
-                children_genes = torch.where(mask, children_genes * noise, children_genes)
+                children_genes = torch.where(mask_local, children_genes * noise, children_genes)
+                
+                # Global mutation
+                mask_global = torch.rand(children_genes.shape, device=device) < 0.05
+                random_jump = torch.empty_like(children_genes).uniform_(0.1, 15.0)
+                children_genes = torch.where(mask_global, random_jump, children_genes)
                 
                 genes[k][1:] = children_genes
-                genes[k][0] = global_best_params[k]
+                genes[k][0] = global_best_params[k] 
                 
-                # Bounds
                 if k == 'target_altitude':
                     genes[k].clamp_(min=config.Z_MIN, max=config.Z_MAX)
                 elif 'ali' in k or k == 'y_acc':
@@ -221,18 +235,21 @@ def optimize_pytorch(devices):
     logger.close()
     return final_params, logger
 
-def generate_final_data_pytorch(params, logger, device):
-    print("\n[PyTorch] Generating final trajectory...")
+def generate_final_data_pytorch(params, logger, device, env_idx=0):
+    print(f"\n[PyTorch] Generating final trajectory (initial condition #{env_idx})...")
     torch.manual_seed(42)
     
-    # Init state
-    pos, phi, v, vz = get_deterministic_initial_state(1, NB_DRONES, device=device)
+    n_envs = getattr(config, 'N_INIT_CONDITIONS', 4)
+    pos_all, phi_all, v_all, vz_all = get_deterministic_initial_state(1, NB_DRONES, device=device)
+    idx = min(env_idx, n_envs - 1)
+
     
-    pos = pos[0:1]
-    phi = phi[0:1]
-    v = v[0:1]
-    if vz is not None:
-        vz = vz[0:1]
+    # Init state
+    pos = pos_all[idx:idx+1]
+    phi = phi_all[idx:idx+1]
+    v   = v_all[idx:idx+1]
+    vz  = vz_all[idx:idx+1] if vz_all is not None else None
+
     
     history_pos, history_phi, history_v, history_vz = [], [], [], []
     history_cov = []
@@ -242,8 +259,8 @@ def generate_final_data_pytorch(params, logger, device):
         grid = TensorExplorationGrid(1, NB_DRONES, config.ARENA_RADIUS, config.GRID_RES, device=device)
     
     eye_mask_single = torch.eye(NB_DRONES, dtype=torch.bool, device=device).expand(1, NB_DRONES, NB_DRONES)
-    noise_buffer = torch.empty_like(phi)
-    
+    shared_noise = torch.empty((n_envs, NB_DRONES), device=device)
+        
     # Visu loop
     for t in range(VISU_STEPS): 
         history_pos.append(pos.clone())
@@ -251,6 +268,9 @@ def generate_final_data_pytorch(params, logger, device):
         history_v.append(v.clone())
         if vz is not None:
             history_vz.append(vz.clone())
+
+        shared_noise.uniform_(-0.1, 0.1)
+        noise_buffer = shared_noise[idx:idx+1]
 
         acc, phi_dot, vz_dot = compute_derivatives(
             pos, phi, v, params, vz=vz, grid=grid,
@@ -314,5 +334,25 @@ if __name__ == "__main__":
 
     # Main sequence run
     best_p, logger = optimize_pytorch(devices)
-    generate_final_data_pytorch(best_p, logger, primary_device)
+
+    # --- Select the best initial condition to counter the min-max bias ---
+    print("\n[PyTorch] Selecting best initial condition for visualization...")
+    with torch.no_grad():
+        torch.manual_seed(42)
+        best_genes = {k: torch.tensor([[getattr(best_p, k)]], device=primary_device)
+                      for k in vars(best_p)}
+        
+        _, _, per_env_costs = run_batch_pytorch(best_genes, primary_device)
+        
+        best_env_idx = int(torch.argmin(per_env_costs[0]).item())
+        best_env_cost = per_env_costs[0, best_env_idx].item()
+        worst_env_cost = per_env_costs[0].max().item()
+        
+        print(f"[PyTorch] Condition costs: {[f'{c:.1f}' for c in per_env_costs[0].tolist()]}")
+        print(f"[PyTorch] → Selected condition #{best_env_idx} "
+              f"(cost {best_env_cost:.2f} vs worst {worst_env_cost:.2f})")
+
+    print(f"[PyTorch] Génération de la trajectoire finale (Condition #{best_env_idx})...")
+    generate_final_data_pytorch(best_p, logger, primary_device, env_idx=best_env_idx)
     generate_gif_from_log(logger.log_dir)
+

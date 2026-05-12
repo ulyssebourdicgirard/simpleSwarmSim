@@ -27,11 +27,11 @@ SPOIL_ADD = 0.02
 POP_SIZE_CPU = 150        
 GEN_CPU = 20              
 
-POP_SIZE_GPU = 5000   # PyTorch uses this one   
-GEN_GPU = 20             
+POP_SIZE_GPU = 500   # PyTorch uses this one   
+GEN_GPU = 10             
 
-SIM_STEPS = 3000         
-VISU_STEPS = 6000     
+SIM_STEPS = 300         
+VISU_STEPS = 600     
 
 # Initial Conditions & Robustness
 N_INIT_CONDITIONS = 4     # Nombre de situations initiales différentes
@@ -48,12 +48,12 @@ FOV_FACTOR = 0.9                    # Tangente du demi-angle du cône de vision 
 if FULL_MILLING_MODE:
     SCENARIO = "default" # No grid exploration
     W_EFFORT = 0       
-    W_DISP = 10.0        
-    W_POL = 250.0          # No reward for flying in a straight line
-    W_COLL = 50.0       
+    W_DISP = 0#10.0        
+    W_POL = 0#250.0          # No reward for flying in a straight line
+    W_COLL = 0#50.0       
     W_MILL = -600.0      # NEGATIVE VALUE to reward milling
     W_EXPLO = 0.0
-    W_STATIONARY = 50       # To keep the barycenter from moving for exploits, POSITIVE -> rewards being stationary
+    W_STATIONARY = 0#50       # To keep the barycenter from moving for exploits, POSITIVE -> rewards being stationary
 else:
     W_EFFORT = 1.0  # To avoid shaking
     W_DISP = 0.0

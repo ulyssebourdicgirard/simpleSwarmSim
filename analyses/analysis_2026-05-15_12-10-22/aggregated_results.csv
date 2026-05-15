@@ -1,0 +1,7 @@
+file_path,run_name,Timestamp,Map Strategy,Explo Strategy,Cost,Coverage (%)
+logs\2026-05-10_09-11-14_explo_sweep\2026-05-10_09-11-15_PyTorch_MULTI_2xGPU_3D\report_3D.md,2026-05-10_09-11-15_PyTorch_MULTI_2xGPU_3D,2026-05-10 09:11:15,global,local_gradient,-133717.73,91.14
+logs\2026-05-10_09-11-14_explo_sweep\2026-05-10_09-21-01_PyTorch_MULTI_2xGPU_3D\report_3D.md,2026-05-10_09-21-01_PyTorch_MULTI_2xGPU_3D,2026-05-10 09:21:01,global,global_best,-134453.88,89.56
+logs\2026-05-10_09-11-14_explo_sweep\2026-05-10_09-35-15_PyTorch_MULTI_2xGPU_3D\report_3D.md,2026-05-10_09-35-15_PyTorch_MULTI_2xGPU_3D,2026-05-10 09:35:15,local_individual,local_gradient,-120900.88,71.52
+logs\2026-05-10_09-11-14_explo_sweep\2026-05-10_09-47-09_PyTorch_MULTI_2xGPU_3D\report_3D.md,2026-05-10_09-47-09_PyTorch_MULTI_2xGPU_3D,2026-05-10 09:47:09,local_individual,global_best,-121514.23,93.35
+logs\2026-05-10_09-11-14_explo_sweep\2026-05-10_10-03-41_PyTorch_MULTI_2xGPU_3D\report_3D.md,2026-05-10_10-03-41_PyTorch_MULTI_2xGPU_3D,2026-05-10 10:03:41,local_shared,local_gradient,-127638.38,89.56
+logs\2026-05-10_09-11-14_explo_sweep\2026-05-10_10-15-36_PyTorch_MULTI_2xGPU_3D\report_3D.md,2026-05-10_10-15-36_PyTorch_MULTI_2xGPU_3D,2026-05-10 10:15:36,local_shared,global_best,-130900.92,87.97

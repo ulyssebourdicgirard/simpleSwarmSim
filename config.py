@@ -27,11 +27,11 @@ SPOIL_ADD = 0.02
 POP_SIZE_CPU = 150        
 GEN_CPU = 20              
 
-POP_SIZE_GPU = 500   # PyTorch uses this one   
+POP_SIZE_GPU = 5000   # PyTorch uses this one   
 GEN_GPU = 10             
 
-SIM_STEPS = 300         
-VISU_STEPS = 600     
+SIM_STEPS = 400         
+VISU_STEPS = 800     
 
 # Initial Conditions & Robustness
 N_INIT_CONDITIONS = 4     # Nombre de situations initiales différentes

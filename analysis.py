@@ -4,11 +4,12 @@ from datetime import datetime
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 
 def parse_reports(log_dir: str, start_date: str, end_date: str) -> pd.DataFrame:
     """Extraie paramètres GA sur période."""
-    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-    end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
     
     data = []
     pattern = re.compile(r"\| (\d+)\s+\| ([\d\.\-]+)\s+\| [\d\.\-]+\s+\| (.*) \|")
@@ -45,34 +46,47 @@ def parse_reports(log_dir: str, start_date: str, end_date: str) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 def plot_patterns(df: pd.DataFrame, output_path: str):
-    """Génère et sauvegarde heatmap corrélation."""
+    """Génère et sauvegarde heatmap corrélation propre."""
     df_params = df.drop(columns=['Generation', 'Cost', 'Session'], errors='ignore')
+    df_params = df_params.loc[:, df_params.std() > 0]
+    # Calcul de la matrice de corrélation
+    corr = df_params.corr()
+    mask = np.triu(np.ones_like(corr, dtype=bool))
     
-    plt.figure(figsize=(14, 12))
-    sns.heatmap(df_params.corr(), annot=True, cmap='coolwarm', fmt=".2f")
-    plt.title("Parameter Correlation Matrix")
+    # Configuration de la figure
+    plt.figure(figsize=(12, 10))
+    
+    sns.heatmap(corr, mask=mask, annot=True, cmap='RdYlGn', fmt=".2f",
+                square=True, linewidths=.5, cbar_kws={"shrink": .8},
+                annot_kws={"size": 9})
+    
+    plt.title("Parameter Correlation Matrix", pad=20, fontsize=16)
     plt.tight_layout()
-    plt.savefig(output_path)
+    
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
 
 if __name__ == "__main__":
     LOGS_DIR = "logs"
     OUT_DIR = "analyses"
-    START_DATE = "2025-04-01" 
-    END_DATE = "2026-04-08"   
+    
+    START_DATE = "2026-05-14 13:55:00" 
+    END_DATE = "2026-05-14 18:45:00"   
 
     os.makedirs(OUT_DIR, exist_ok=True)
 
     df_res = parse_reports(LOGS_DIR, START_DATE, END_DATE)
     
     if not df_res.empty:
-        df_top = df_res.nsmallest(max(1, int(len(df_res) * 0.1)), 'Cost')
+        df_best_per_run = df_res.loc[df_res.groupby('Session')['Cost'].idxmin()]
+        
+        df_top = df_best_per_run 
         
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         filename = f"corr_matrix_{timestamp}.png"
         out_path = os.path.join(OUT_DIR, filename)
         
         plot_patterns(df_top, out_path)
-        print(f"[Analyse] Sauvegarde : {out_path} ({len(df_res)} individus).")
+        print(f"[Analyse] Sauvegarde : {out_path} ({len(df_top)} individus uniques analysés).")
     else:
         print("[Analyse] Aucune donnée trouvée.")
